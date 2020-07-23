@@ -80,6 +80,7 @@ out202<-out20 %>%
          rca="out",
          year=2020)
 splhr<-bind_rows(in192,in202,out192,out202)
+write.csv(splhr,"wdata/splbyhour.csv")
 
 # grouped by hour----
 ggplot(splhr)+
@@ -149,6 +150,8 @@ d20<-in20d%>%
   distinct()
 spld<-bind_rows(in19d,in20d,out19d,out20d)%>%
   filter(mdh %in% d20$mdh)
+
+write.csv(bind_rows(in19d,in20d,out19d,out20d),"wdata/splbyday.csv")
 # grouped by day----
 ggplot(spld)+
   geom_line(aes(y=spd,x=mdh,color=as.factor(year),group=grp))+
