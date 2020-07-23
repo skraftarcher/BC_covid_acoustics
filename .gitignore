@@ -1,12 +1,12 @@
 # Data files
-.xlsx
-.csv
+*.xlsx
+*.csv
 
 # figures
-.png
-.jpg
-.jpeg
-.tiff
+*.png
+*.jpg
+*.jpeg
+*.tiff
 
 # History files
 .Rhistory
