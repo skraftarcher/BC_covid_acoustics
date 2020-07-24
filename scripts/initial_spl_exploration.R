@@ -5,6 +5,7 @@
 #packages----
 if(!require(tidyverse))install.packages("tidyverse");library(tidyverse)
 if(!require(readxl))install.packages("readxl");library(readxl)
+if(!require(lubridate))install.packages("lubridate");library(lubridate)
 
 theme_set(theme_bw())
 
@@ -52,7 +53,8 @@ splhr<-bind_rows(in192,in202,out192,out202)%>%
             spl05=quantile(SPL,.05),
             spl95=quantile(SPL,.95),
             spl99=quantile(SPL,.99))%>%
-  mutate(mdh=paste(Month,"-",Day,"-",hr))
+  mutate(mdh=paste(Month,"-",Day,"-",hr))%>%
+  arrange(mdh)
 write.csv(splhr,"wdata/splbyhour.csv")
 
 # grouped by hour----
@@ -74,7 +76,8 @@ spld<-bind_rows(in192,in202,out192,out202)%>%
             spl05=quantile(SPL,.05),
             spl95=quantile(SPL,.95),
             spl99=quantile(SPL,.99))%>%
-  mutate(mdh=paste(Month,"-",Day))
+  mutate(mdh=paste(Month,"-",Day))%>%
+  arrange(mdh)
 
 write.csv(bind_rows(in19d,in20d,out19d,out20d),"wdata/splbyday.csv")
 
@@ -110,7 +113,7 @@ splhr2<-splhr%>%
 # plotting only data in both data sets
 
 ggplot(spld2)+
-  geom_line(aes(y=spl50,x=mdh,color=as.factor(year),group=grp))+
+  geom_line(aes(y=spl50,x=mdh,color=as.factor(year),group=grp),size=2)+
   facet_grid(~rca,scales="free")
 
 
@@ -118,4 +121,46 @@ ggplot(splhr2)+
   geom_line(aes(y=spl50,x=mdh,color=as.factor(year),group=grp))+
   facet_grid(~rca,scales="free")
 
+# get additional weather data
+devtools::install_github("ropensci/weathercan")
 
+wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-18",end="2020-06-22")
+wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-18",end="2020-06-22")   
+wthr<-bind_rows(wthr19,wthr20)%>%
+  select(date,year,Month=month,Day=day,wind_dir,wind_spd)%>%
+  mutate(year=as.numeric(year),
+         Month=as.numeric(Month),
+         Day=as.numeric(Day))%>%
+  group_by(date,year,Month,Day)%>%
+  summarize(wd=mean(wind_dir,na.rm = TRUE),ws=mean(wind_spd,na.rm=TRUE))%>%
+  left_join(spld)%>%
+  filter(!is.na(rca))%>%
+  filter(mdh %in% d20$mdh)%>%
+  ungroup()%>%
+  distinct()
+
+wthr1.19<-wthr %>%
+  filter(date<as.Date("2019-05-05")&date>as.Date("2019-04-20"))%>%
+  mutate(tp="early")%>%
+  arrange(date)%>%
+  mutate(d2=seq_len(n()))
+wthr1.20<-wthr %>%
+  filter(date<as.Date("2020-05-05")&date>as.Date("2020-04-20"))%>%
+  mutate(tp="early")%>%
+  arrange(date)%>%
+  mutate(d2=seq_len(n()))
+wthr2.19<-wthr %>%
+  filter(date>as.Date("2019-05-26")&date<as.Date("2019-06-18"))%>%
+  mutate(tp="late")%>%
+  arrange(date)%>%
+  mutate(d2=seq_len(n()))
+wthr2.20<-wthr %>%
+  filter(date>as.Date("2020-05-26")&date<as.Date("2020-06-18"))%>%
+  mutate(tp="late")%>%
+  arrange(date)%>%
+  mutate(d2=seq_len(n()))
+
+
+wthr2<-bind_rows(wthr1.19,wthr1.20,wthr2.19,wthr2.20)
+
+write.csv(wthr2,"wdata/trimmed_with_weather.csv")
