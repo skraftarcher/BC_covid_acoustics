@@ -269,7 +269,7 @@ hr_wthr1.19 <- hr_wthr %>%
   mutate(period = "early") %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
-  mutate(d2 = seq_len(n())) %>%
+  mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr1.20 <- hr_wthr %>%
@@ -277,7 +277,7 @@ hr_wthr1.20 <- hr_wthr %>%
   mutate(period = "early") %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
-  mutate(d2 = seq_len(n())) %>%
+  mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr2.19 <- hr_wthr %>%
@@ -285,7 +285,7 @@ hr_wthr2.19 <- hr_wthr %>%
   mutate(period = "late") %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
-  mutate(d2 = seq_len(n())) %>%
+  mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr2.20 <- hr_wthr %>%
@@ -293,11 +293,11 @@ hr_wthr2.20 <- hr_wthr %>%
   mutate(period = "late") %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
-  mutate(d2 = seq_len(n())) %>%
+  mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20)
 
-saveRDS(wthr2, "wdata/trimmed_hourly_weather.rds")
-wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
-write.csv(wthr2, "wdata/trimmed_hourly_weather.csv")
+saveRDS(hr_wthr2, "wdata/trimmed_hourly_weather.rds")
+hr_wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
+write.csv(hr_wthr2, "wdata/trimmed_hourly_weather.csv")
