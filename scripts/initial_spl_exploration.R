@@ -53,7 +53,7 @@ splhr<-bind_rows(in192,in202,out192,out202)%>%
             spl05=quantile(SPL,.05),
             spl95=quantile(SPL,.95),
             spl99=quantile(SPL,.99))%>%
-  mutate(mdh=paste(Month,"-",Day,"-",hr))%>%
+  mutate(mdh=paste(Month,"-",Day,"-",hr), hr = as.numeric(hr))%>%
   arrange(mdh)
 
 # save and reload in R only form
@@ -127,19 +127,28 @@ ggplot(splhr2)+
   geom_line(aes(y=spl50,x=mdh,color=as.factor(year),group=grp))+
   facet_grid(~rca,scales="free")
 
-# get additional weather data
+# get weather data
 # note: may require updated version of tidyselect package
 if(!require(weathercan)) devtools::install_github("ropensci/weathercan")
 
 wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-18",end="2019-06-22")
 wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-18",end="2020-06-22")   
-wthr<-bind_rows(wthr19,wthr20)%>%
-  select(date,year,Month=month,Day=day,wind_dir,wind_spd)%>%
+
+# add weather by day
+wthr<-bind_rows(wthr19,wthr20)%>% 
+  select(date, year, 
+    Month = month, 
+    Day = day, 
+    wind_dir, wind_spd)%>%
   mutate(year=as.numeric(year),
          Month=as.numeric(Month),
          Day=as.numeric(Day))%>%
-  group_by(date,year,Month,Day)%>%
-  summarize(wd=mean(wind_dir,na.rm = TRUE),ws=mean(wind_spd,na.rm=TRUE))%>%
+  group_by(date,year, Month, Day)%>%
+  summarize(
+    wdir=mean(wind_dir,na.rm = TRUE), 
+    wspeed=mean(wind_spd,na.rm=TRUE)
+    )%>%
+  # join with sound pressure data by year, Month, Day
   left_join(spld)%>%
   filter(!is.na(rca))%>%
   filter(mdh %in% d20$mdh)%>%
@@ -148,28 +157,88 @@ wthr<-bind_rows(wthr19,wthr20)%>%
 
 wthr1.19<-wthr %>%
   filter(date<as.Date("2019-05-05")&date>as.Date("2019-04-20"))%>%
-  mutate(tp="early")%>%
+  mutate(period="early")%>%
   arrange(date)%>%
-  mutate(d2=seq_len(n()))
+  # adds d2 variable that is the sequence of days within each sampling period
+  # can change or remove grouping by period if sequence for whole year desired
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
 wthr1.20<-wthr %>%
   filter(date<as.Date("2020-05-05")&date>as.Date("2020-04-20"))%>%
-  mutate(tp="early")%>%
+  mutate(period="early")%>%
   arrange(date)%>%
-  mutate(d2=seq_len(n()))
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
 wthr2.19<-wthr %>%
   filter(date>as.Date("2019-05-26")&date<as.Date("2019-06-18"))%>%
-  mutate(tp="late")%>%
+  mutate(period="late")%>%
   arrange(date)%>%
-  mutate(d2=seq_len(n()))
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
 wthr2.20<-wthr %>%
   filter(date>as.Date("2020-05-26")&date<as.Date("2020-06-18"))%>%
-  mutate(tp="late")%>%
+  mutate(period="late")%>%
   arrange(date)%>%
-  mutate(d2=seq_len(n()))
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
 
 
 wthr2<-bind_rows(wthr1.19,wthr1.20,wthr2.19,wthr2.20)
 
-saveRDS(wthr2,"wdata/trimmed_with_weather.rds")
-wthr2 <- readRDS("wdata/trimmed_with_weather.rds")
-write.csv(wthr2,"wdata/trimmed_with_weather.csv")
+saveRDS(wthr2,"wdata/trimmed_daily_weather.rds")
+wthr2 <- readRDS("wdata/trimmed_daily_weather.rds")
+write.csv(wthr2,"wdata/trimmed_daily_weather.csv")
+
+
+# add weather by hr 
+hr_wthr <- bind_rows(wthr19, wthr20) %>%
+  separate(hour, into = c("hr", "min"), sep = ":") %>%
+  select(date, year,
+    Month = month,
+    Day = day,
+    hr,
+    wind_dir, wind_spd
+  ) %>%
+  mutate(
+    year = as.numeric(year),
+    Month = as.numeric(Month),
+    Day = as.numeric(Day),
+    hr = as.numeric(hr)
+  ) %>%
+  group_by(date, year, Month, Day, hr) %>%
+  summarize(
+    wdir = mean(wind_dir, na.rm = TRUE),
+    wspeed = mean(wind_spd, na.rm = TRUE)
+  ) %>%
+  # join with sound pressure data by year, Month, Day, hr
+  left_join(splhr) %>%
+  filter(!is.na(rca)) %>%
+  # filter(mdh %in% d20$mdh)%>%
+  ungroup() %>%
+  distinct()
+
+hr_wthr1.19 <- hr_wthr %>%
+  filter(date < as.Date("2019-05-05") & date > as.Date("2019-04-20")) %>%
+  mutate(period = "early") %>%
+  arrange(date) %>% 
+  group_by(rca, year, period) %>% mutate(d2 = seq_len(n())) %>% ungroup()
+
+hr_wthr1.20 <- hr_wthr %>%
+  filter(date < as.Date("2020-05-05") & date > as.Date("2020-04-20")) %>%
+  mutate(period = "early") %>%
+  arrange(date) %>% 
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
+
+hr_wthr2.19 <- hr_wthr %>%
+  filter(date > as.Date("2019-05-26") & date < as.Date("2019-06-18")) %>%
+  mutate(period = "late") %>%
+  arrange(date) %>%
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
+
+hr_wthr2.20 <- hr_wthr %>%
+  filter(date > as.Date("2020-05-26") & date < as.Date("2020-06-18")) %>%
+  mutate(period = "late") %>%
+  arrange(date) %>%
+  group_by(rca, year, period)  %>% mutate(d2 = seq_len(n())) %>% ungroup()
+
+hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20)
+
+saveRDS(wthr2, "wdata/trimmed_hourly_weather.rds")
+wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
+write.csv(wthr2, "wdata/trimmed_hourly_weather.csv")
