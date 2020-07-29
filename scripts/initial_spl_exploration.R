@@ -55,6 +55,12 @@ splhr<-bind_rows(in192,in202,out192,out202)%>%
             spl99=quantile(SPL,.99))%>%
   mutate(mdh=paste(Month,"-",Day,"-",hr))%>%
   arrange(mdh)
+
+# save and reload in R only form
+saveRDS(splhr,"wdata/splbyhour.rds")
+splhr <- readRDS("wdata/splbyhour.rds")
+
+# save for export to other platforms
 write.csv(splhr,"wdata/splbyhour.csv")
 
 # grouped by hour----
@@ -63,8 +69,6 @@ ggplot(splhr)+
   facet_wrap(~rca)
 
 # create a dataset that is aggregated by day, same variables are calculated 
-
-
 spld<-bind_rows(in192,in202,out192,out202)%>%
   separate(Time,into=c("hr","min","sec"),sep=":")%>%
   separate(hr,into=c("wste","hr"),sep=" ",remove=TRUE)%>%
@@ -79,7 +83,9 @@ spld<-bind_rows(in192,in202,out192,out202)%>%
   mutate(mdh=paste(Month,"-",Day))%>%
   arrange(mdh)
 
-write.csv(bind_rows(in19d,in20d,out19d,out20d),"wdata/splbyday.csv")
+saveRDS(spld,"wdata/splbyday.rds")
+spld <- readRDS("wdata/splbyday.rds")
+write.csv(spld,"wdata/splbyday.csv")
 
 # grouped by day----
 ggplot(spld)+
@@ -122,9 +128,10 @@ ggplot(splhr2)+
   facet_grid(~rca,scales="free")
 
 # get additional weather data
-devtools::install_github("ropensci/weathercan")
+# note: may require updated version of tidyselect package
+if(!require(weathercan)) devtools::install_github("ropensci/weathercan")
 
-wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-18",end="2020-06-22")
+wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-18",end="2019-06-22")
 wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-18",end="2020-06-22")   
 wthr<-bind_rows(wthr19,wthr20)%>%
   select(date,year,Month=month,Day=day,wind_dir,wind_spd)%>%
@@ -163,4 +170,6 @@ wthr2.20<-wthr %>%
 
 wthr2<-bind_rows(wthr1.19,wthr1.20,wthr2.19,wthr2.20)
 
+saveRDS(wthr2,"wdata/trimmed_with_weather.rds")
+wthr2 <- readRDS("wdata/trimmed_with_weather.rds")
 write.csv(wthr2,"wdata/trimmed_with_weather.csv")
