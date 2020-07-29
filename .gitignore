@@ -1,6 +1,7 @@
 # Data files
 *.xlsx
 *.csv
+*.rds
 
 # figures
 *.png
