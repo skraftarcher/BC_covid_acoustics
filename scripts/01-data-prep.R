@@ -266,7 +266,9 @@ hr_wthr <- bind_rows(wthr19, wthr20) %>%
 
 hr_wthr1.19 <- hr_wthr %>%
   filter(date <= as.Date("2019-05-10") & date >= as.Date("2019-04-14")) %>%
-  mutate(period = "early") %>%
+  mutate(period = "early", 
+    position = if_else(rca== "in", "fixed1", "fixed2")
+  ) %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
   mutate(h2 = seq_len(n())) %>%
@@ -274,29 +276,56 @@ hr_wthr1.19 <- hr_wthr %>%
 
 hr_wthr1.20 <- hr_wthr %>%
   filter(date <= as.Date("2020-05-10") & date >= as.Date("2020-04-14")) %>%
-  mutate(period = "early") %>%
+  mutate(period = "early", 
+    position = if_else(rca== "in", "drop1", "drop2")
+  ) %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
   mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr2.19 <- hr_wthr %>%
-  filter(date >= as.Date("2019-05-20") & date <= as.Date("2019-06-25")) %>%
-  mutate(period = "late") %>%
+  filter(date >= as.Date("2019-05-20") & date < as.Date("2019-06-01")) %>%
+  mutate(period = "pre-ferry", 
+    position = if_else(rca== "in", "fixed1", "fixed2")
+  ) %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
   mutate(h2 = seq_len(n())) %>%
   ungroup()
 
 hr_wthr2.20 <- hr_wthr %>%
-  filter(date >= as.Date("2020-05-20") & date <= as.Date("2020-06-25")) %>%
-  mutate(period = "late") %>%
+  filter(date >= as.Date("2020-05-20") & date < as.Date("2020-06-01")) %>%
+  mutate(period = "pre-ferry",
+    position = if_else(rca== "in", "drop3", "drop4")
+  ) %>%
   arrange(date) %>%
   group_by(rca, year, period) %>%
   mutate(h2 = seq_len(n())) %>%
   ungroup()
 
-hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20)
+hr_wthr3.19 <- hr_wthr %>%
+  filter(date >= as.Date("2019-06-01") & date <= as.Date("2019-06-25")) %>%
+  mutate(period = "with-ferry", 
+    position = if_else(rca== "in", "fixed1", "fixed2")
+  ) %>%
+  arrange(date) %>%
+  group_by(rca, year, period) %>%
+  mutate(h2 = seq_len(n())) %>%
+  ungroup()
+
+hr_wthr3.20 <- hr_wthr %>%
+  filter(date >= as.Date("2020-06-01") & date <= as.Date("2020-06-25")) %>%
+  mutate(period = "with-ferry",
+    position = if_else(rca== "in", "drop3", "drop4")
+    ) %>%
+  arrange(date) %>%
+  group_by(rca, year, period) %>%
+  mutate(h2 = seq_len(n())) %>%
+  ungroup()
+
+
+hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20, hr_wthr3.19, hr_wthr3.20)
 
 saveRDS(hr_wthr2, "wdata/trimmed_hourly_weather.rds")
 hr_wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
