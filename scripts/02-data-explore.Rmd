@@ -6,12 +6,11 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-if (!require(tidyverse)) install.packages("tidyverse")
-library(tidyverse)
-# if (!require(readxl)) install.packages("readxl") library(readxl)
-if (!require(lubridate)) install.packages("lubridate") 
-library(lubridate)
+if (!require(tidyverse)) install.packages("tidyverse"); library(tidyverse)
+if (!require(lubridate)) install.packages("lubridate"); library(lubridate)
 if (!require(EnvStats)) install.packages("EnvStats") 
+if (!require(devtools)) install.packages("devtools")
+if (!require(gfplot)) devtools::install_github("pbs-assess/gfplot")
 
 theme_set(gfplot:::theme_pbs())
 
@@ -37,13 +36,10 @@ hourly %>%
   facet_grid(rca~period, scales = "free")
 ```
 
-Add time continuous plot
-
-```{r}
-
+```{r eval = FALSE, include = FALSE}
+# daily %>% glimpse()
+hourly %>% glimpse()
 ```
-
-
 ## Check for effect of wind speed at quietest time of night
 Noisier at RCA out... maybe because closer to shore?
 
@@ -310,10 +306,42 @@ m <- lm(spl95 ~ period * as.factor(year) + period * rca
 summary(m)
 ```
 
+
+Time continuous plot
+In full data set there is some temporal autocorrelation that we would need to control for
+```{r}
+hourly %>% 
+ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
+  geom_point(alpha = 0.5, size = 0.5)+
+  geom_line(alpha = 0.5)+
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  coord_cartesian(ylim = c(90, 120))+
+  facet_grid(rca~period, scales="free") +
+  xlab("Time")
+```
+
+Still quite a bit in the daytime low wind version 
+```{r}
+hourly %>% filter( 
+  wspeed < 20 & hr >= 9 & hr <= 17
+  ) %>%
+ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
+  geom_point(alpha = 0.8)+
+  geom_line(alpha = 0.2)+
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  coord_cartesian(ylim = c(90, 120))+
+  facet_grid(rca~period, scales="free") +
+  xlab("Time")
+```
+
+
+
 # Control for potential differences in each drop using mixed model
 
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) 
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) + (1|md) + (1|mdh)
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
 summary(m)
 ```
@@ -321,24 +349,23 @@ summary(m)
 Add in windy times, while controling for wind speed to increase sample size
 Now all periods are significant!
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) 
-  , data = filter(hourly, wspeed < 40 & hr >= 9 & hr <= 17))
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) + (1|mdh) #+ (1|md)
+  , data = filter(hourly, wspeed < 30 & hr >= 9 & hr <= 17))
 summary(m)
 ```
 
 ### Are quietest times quieter?
-Yes, but weaker effect than median
 ```{r}
-m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca + (1|position), 
+m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca + (1|position)+ (1|md), 
   # data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
-  data = filter(hourly, wspeed < 10 & hr < 4 & hr > 0))
+  data = filter(hourly, wspeed < 20 & hr < 4 & hr > 0))
 summary(m)
 ```
 
 ### Are noisiest times quieter? 
 Not significantly
 ```{r}
-m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) 
+m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) + (1|md)
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
 summary(m)
 ```
