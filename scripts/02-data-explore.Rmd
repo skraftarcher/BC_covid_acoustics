@@ -23,7 +23,7 @@ daily <- readRDS(here::here("wdata/trimmed_daily_weather.rds"))
 hourly <- readRDS(here::here("wdata/trimmed_hourly_weather.rds"))
 ```
 
-```{r eval = FALSE}
+```{r eval = FALSE, include = FALSE}
 daily %>% 
   ggplot(aes(y = wspeed, x = as.factor(year), color = as.factor(year))) +
   geom_violin() +
@@ -36,6 +36,13 @@ hourly %>%
   geom_jitter(alpha =0.2) +
   facet_grid(rca~period, scales = "free")
 ```
+
+Add time continuous plot
+
+```{r}
+
+```
+
 
 ## Check for effect of wind speed at quietest time of night
 Noisier at RCA out... maybe because closer to shore?
@@ -89,6 +96,7 @@ hourly %>% filter(
   ylab("Median hourly sound pressure") +
   ggtitle("Soundscape at night when wind speed <10 km/hr")
 ```
+
 ## What time of day is noisiest?
 ```{r}
 # time of day
@@ -106,7 +114,7 @@ hourly %>% filter(
   ggtitle("Changes through the day when wind speed <10 km/hr")
 ```
 
-```{r eval = FALSE}
+```{r }
 hourly %>% filter(
   wspeed < 20 # ~ 10 knots
 ) %>%
@@ -201,7 +209,9 @@ hourly %>% filter(
   ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), group = grp)) +
   geom_smooth(method = "lm") +
   geom_point(alpha = 0.2, size = 2) +
-  facet_grid(~rca, scales = "free") +
+  facet_grid(~rca, scales = "free") +  
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ggtitle("N or NW winds")
 
 # NE or E winds are rare
@@ -212,6 +222,8 @@ hourly %>% filter(
   geom_smooth(method = "lm") +
   geom_point(alpha = 0.2, size = 2) +
   facet_grid(~rca, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ggtitle("NE or E winds are rare")
 
 # SE winds
@@ -222,6 +234,8 @@ hourly %>% filter(#wspeed < 10,
   geom_smooth(method = "lm") +
   geom_point(alpha = 0.2, size = 2) +
   facet_grid(~rca, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ggtitle("SE winds")
 
 # SW OR W winds
@@ -233,6 +247,8 @@ hourly %>% filter(
   geom_smooth(method = "lm") +
   geom_point(alpha = 0.2, size = 2) +
   facet_grid(~rca, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ggtitle("SW OR W winds")
 ```
 
@@ -295,16 +311,25 @@ summary(m)
 ```
 
 # Control for potential differences in each drop using mixed model
+
 ```{r}
-m <- lmerTest::lmer(spl50 ~ period * as.factor(year) + period * rca + (1|position) 
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) 
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
+summary(m)
+```
+
+Add in windy times, while controling for wind speed to increase sample size
+Now all periods are significant!
+```{r}
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) 
+  , data = filter(hourly, wspeed < 40 & hr >= 9 & hr <= 17))
 summary(m)
 ```
 
 ### Are quietest times quieter?
 Yes, but weaker effect than median
 ```{r}
-m <- lmerTest::lmer(spl05 ~ period * as.factor(year) + period * rca + (1|position), 
+m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca + (1|position), 
   # data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
   data = filter(hourly, wspeed < 10 & hr < 4 & hr > 0))
 summary(m)
@@ -313,7 +338,7 @@ summary(m)
 ### Are noisiest times quieter? 
 Not significantly
 ```{r}
-m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + period * rca + (1|position) 
+m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) 
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
 summary(m)
 ```
