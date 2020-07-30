@@ -1,0 +1,319 @@
+---
+title: "Anthropause initial sound pressure and weather data exploration"
+author: "Philina English"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+if (!require(tidyverse)) install.packages("tidyverse")
+library(tidyverse)
+# if (!require(readxl)) install.packages("readxl") library(readxl)
+if (!require(lubridate)) install.packages("lubridate") 
+library(lubridate)
+if (!require(EnvStats)) install.packages("EnvStats") 
+
+theme_set(gfplot:::theme_pbs())
+
+# all sound pressure data pooled by hr
+# splhr <- readRDS("wdata/splbyhour.rds") 
+
+# sound pressure and weather data 
+daily <- readRDS(here::here("wdata/trimmed_daily_weather.rds"))
+hourly <- readRDS(here::here("wdata/trimmed_hourly_weather.rds"))
+```
+
+```{r eval = FALSE}
+daily %>% 
+  ggplot(aes(y = wspeed, x = as.factor(year), color = as.factor(year))) +
+  geom_violin() +
+  geom_point(alpha =0.2) +
+  facet_grid(rca~period, scales = "free")
+
+hourly %>% 
+  ggplot(aes(y = wspeed, x = as.factor(year), color = as.factor(year))) +
+  geom_violin() +
+  geom_jitter(alpha =0.2) +
+  facet_grid(rca~period, scales = "free")
+```
+
+## Check for effect of wind speed at quietest time of night
+Noisier at RCA out... maybe because closer to shore?
+
+```{r}
+# wind speed at night 
+hourly %>% filter(
+  hr < 4 & hr > 0
+) %>%
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_wrap(~rca) +
+  xlab ("Wind speed") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape at night ('out' is closer to shore)")
+```
+
+### Wind speed under 20 km/hr seems acceptable 
+```{r}
+# wind speed under 20 seems acceptable 
+hourly %>% filter(
+  # (hr < 4 | hr > 10),
+  wspeed < 20 # ~ 10 knots
+  ) %>%
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(rca~period, scales = "free")+
+  xlab ("Wind speed") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape when wind speed <20 km/hr")
+```
+
+```{r}
+hourly %>% filter(
+  (hr < 4 | hr > 10), # at night only
+  wspeed < 10 # ~ 5 knots
+  ) %>%
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(rca~period, scales = "free")+
+  xlab ("Wind speed") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape at night when wind speed <10 km/hr")
+```
+## What time of day is noisiest?
+```{r}
+# time of day
+hourly %>% filter(
+  wspeed < 10 # ~ 5 knots
+) %>%
+  ggplot(aes(y = spl50, x = hr, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(rca~period, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  xlab ("Time of day") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Changes through the day when wind speed <10 km/hr")
+```
+
+```{r eval = FALSE}
+hourly %>% filter(
+  wspeed < 20 # ~ 10 knots
+) %>%
+  ggplot(aes(y = spl50, x = hr, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(rca~period, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  xlab ("Time of day") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Changes through the day when wind speed <20 km/hr")
+```
+
+## Boxplots
+```{r}
+# boxplot
+hourly %>% filter(
+  # hr >= 9 & hr <= 17, # between 9-5; busiest
+  # hr < 4 & hr > 2, # between 2-4 am; quietest 
+  wspeed < 10
+) %>%
+  ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
+  # geom_violin() +
+  geom_boxplot() +
+  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  # geom_jitter(alpha=0.2) +
+  facet_wrap(~rca, nrow = 2) +
+  # facet_wrap(~grp, nrow = 2) +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  xlab("Time period") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape differences with COVID when wind < 10 km/hr")
+```
+
+```{r}
+# boxplot
+hourly %>% filter(
+  # hr >= 9 & hr <= 17, # between 9-5; busiest
+  hr < 4 & hr > 0, # between 2-4 am; quietest
+  wspeed < 10
+) %>%
+  ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year), fill = as.factor(year))) +
+  # # geom_violin() +
+  #  geom_violin(aes(y = spl95, x = as.factor(period), colour = as.factor(year)), inherit.aes = F) +
+  #  geom_violin(aes(y = spl05, x = as.factor(period), colour = as.factor(year)), inherit.aes = F) +
+   geom_boxplot(alpha = 0.5) +
+  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  # geom_jitter(alpha=0.2) +
+  facet_wrap(~rca, nrow = 2) +
+  # facet_wrap(~grp, nrow = 2) +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  # scale_fill_discrete(name= "Year") +
+  # scale_colour_discrete(name= "Year") + 
+  xlab("Time period") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape nighttime differences with COVID when wind < 10 km/hr")
+```
+## Busiest time of day
+```{r}
+# boxplot
+hourly %>% filter(
+  hr >= 9 & hr <= 17, # between 9-5; busiest
+  # hr < 4 & hr > 2, # between 2-4 am; quietest 
+  wspeed < 10
+) %>%
+  ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
+  # geom_violin() +
+  geom_boxplot( outlier.alpha = 0) +
+  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  geom_point(position = position_jitterdodge(), alpha=0.2) +
+  facet_wrap(~rca, nrow = 2) +
+  # facet_wrap(~grp, nrow = 2) +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  xlab("Time period") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape daytime differences with COVID when wind < 10 km/hr")
+```
+
+## Explore the effect of wind direction at both sites
+All directions also noisier at RCA out
+But hopefully we can ignore direction if calm 
+```{r}
+# N or NW winds
+hourly %>% filter(
+  #wspeed < 10, 
+  hr < 7,
+  wdir == 1 |  wdir >= 32) %>% # effects both equally
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), group = grp)) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(~rca, scales = "free") +
+  ggtitle("N or NW winds")
+
+# NE or E winds are rare
+hourly %>% filter(  
+  hr < 7,
+  wdir > 1 & wdir < 13) %>%
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), group = grp)) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(~rca, scales = "free") +
+  ggtitle("NE or E winds are rare")
+
+# SE winds
+hourly %>% filter(#wspeed < 10, 
+  hr < 7,
+  wdir >= 13 & wdir < 18) %>% # appears to effect RCA in most
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), group = grp)) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(~rca, scales = "free") +
+  ggtitle("SE winds")
+
+# SW OR W winds
+hourly %>% filter(
+  #wspeed < 10, 
+  hr < 7,
+  wdir >= 18 & wdir < 32) %>% # appears to effect RCA in most
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), group = grp)) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(~rca, scales = "free") +
+  ggtitle("SW OR W winds")
+```
+
+# ANOVA
+```{r}
+m <- aov(spl50 ~ 
+    position + # unique intercepts for each location 
+    period * as.factor(year) +# time variables interacting?
+    period * rca # site difference might vary seasonally?
+  , data = filter(hourly, wspeed < 20))
+summary(m)
+```
+
+```{r}
+m <- aov(spl50 ~ 
+    period * as.factor(year) + # year and postition are confounded
+    period * rca # site difference might vary seasonally?
+  , data = filter(hourly, wspeed < 20))
+summary(m)
+TukeyHSD(m)
+```
+
+
+# ANCOVA
+```{r}
+# add daily curve 
+m <- lm(spl50 ~ poly(hr, 2) + period * as.factor(year) + period * rca, 
+  data = filter(hourly, wspeed < 20))
+summary(m)
+```
+
+but the shape of daily curve does interact with year and period
+```{r}
+# but the shape of daily curve does interact with year and period
+m <- lm(spl50 ~ poly(hr, 2) * period * as.factor(year) + period * rca, 
+  data = filter(hourly, wspeed < 20))
+summary(m)
+```
+
+so extract noisiest period only 
+```{r}
+# so extract noisiest period only 
+m <- lm(spl50 ~ period * as.factor(year) + period * rca
+  , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
+summary(m)
+```
+
+What about the quietest 5th?
+```{r}
+m <- lm(spl05 ~ period * as.factor(year) + period * rca
+  , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
+summary(m)
+```
+
+What about the noisiest 5th?
+```{r}
+m <- lm(spl95 ~ period * as.factor(year) + period * rca
+  , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
+summary(m)
+```
+
+# Control for potential differences in each drop using mixed model
+```{r}
+m <- lmerTest::lmer(spl50 ~ period * as.factor(year) + period * rca + (1|position) 
+  , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
+summary(m)
+```
+
+### Are quietest times quieter?
+Yes, but weaker effect than median
+```{r}
+m <- lmerTest::lmer(spl05 ~ period * as.factor(year) + period * rca + (1|position), 
+  # data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
+  data = filter(hourly, wspeed < 10 & hr < 4 & hr > 0))
+summary(m)
+```
+
+### Are noisiest times quieter? 
+Not significantly
+```{r}
+m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + period * rca + (1|position) 
+  , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
+summary(m)
+```
