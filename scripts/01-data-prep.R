@@ -3,9 +3,9 @@
 # this script extracts and merges sound pressure data
 
 # packages----
-if (!require(tidyverse)) install.packages("tidyverse") library(tidyverse)
-if (!require(readxl)) install.packages("readxl") library(readxl)
-if (!require(lubridate)) install.packages("lubridate") library(lubridate)
+if (!require(tidyverse)) install.packages("tidyverse"); library(tidyverse)
+if (!require(readxl)) install.packages("readxl"); library(readxl)
+if (!require(lubridate)) install.packages("lubridate"); library(lubridate)
 
 theme_set(theme_bw())
 
@@ -127,7 +127,7 @@ write.csv(spld, "wdata/splbyday.csv")
 
 # grouped by day----
 ggplot(spld) +
-  geom_line(aes(y = spl50, x = mdh, color = as.factor(year), group = grp)) +
+  geom_line(aes(y = spl50, x = md, color = as.factor(year), group = grp)) +
   facet_grid(~rca, scales = "free")
 
 # subset down to only time periods recorded in 2020
@@ -145,7 +145,7 @@ d20 <- spld %>%
   ungroup() %>%
   filter(year == 2020) %>%
   select(md) %>%
-  distinct()
+  distinct() 
 sort(d20[[1]])
 
 hr20 <- splhr %>%
@@ -155,14 +155,14 @@ hr20 <- splhr %>%
   distinct()
 
 spld2 <- spld %>%
-  filter(mdh %in% d20$md)
+  filter(md %in% d20$md)
 
 splhr2 <- splhr %>%
   filter(mdh %in% hr20$mdh)
 
 # plotting only data in both data sets
 ggplot(spld2) +
-  geom_line(aes(y = spl50, x = mdh, color = as.factor(year), group = grp), size = 2) +
+  geom_line(aes(y = spl50, x = md, color = as.factor(year), group = grp), size = 2) +
   facet_grid(~rca, scales = "free")
 
 ggplot(splhr2) +
@@ -330,3 +330,4 @@ hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20, hr_wth
 saveRDS(hr_wthr2, "wdata/trimmed_hourly_weather.rds")
 hr_wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
 write.csv(hr_wthr2, "wdata/trimmed_hourly_weather.csv")
+
