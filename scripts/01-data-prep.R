@@ -57,15 +57,22 @@ out202 <- out20 %>%
       !(Month == 6 & Day >= 19) # day retrived for period 2
   )
 
+
+
+
+
+
 # create a dataset that is aggregated by the hour,
 # several variables are calculated, 1,5,50,95, and 99 quantiles as well as the root mean square error
 
 splhr <- bind_rows(in192, in202, out192, out202) %>%
   separate(Time, into = c("hr", "min", "sec"), sep = ":") %>%
   separate(hr, into = c("wste", "hr"), sep = " ", remove = TRUE) %>%
-  select(-wste) %>%
+  select(-wste) %>% 
+  mutate(overall_min = min(.$SPL), SPL = SPL - overall_min) %>% 
   group_by(year, rca, grp, Month, Day, hr) %>%
   summarize(
+    min_threshold = median(overall_min),
     spl50 = median(SPL),
     rmsspl = sqrt(mean(SPL^2)),
     spl01 = quantile(SPL, .01),
@@ -98,13 +105,20 @@ ggplot(splhr) +
   geom_line(aes(y = rmsspl, x = mdh, color = as.factor(year), group = grp)) +
   facet_wrap(~rca)
 
+
+
+
+
+
 # create a dataset that is aggregated by day, same variables are calculated
 spld <- bind_rows(in192, in202, out192, out202) %>%
   separate(Time, into = c("hr", "min", "sec"), sep = ":") %>%
   separate(hr, into = c("wste", "hr"), sep = " ", remove = TRUE) %>%
   select(-wste) %>%
+  mutate(overall_min = min(.$SPL), SPL = SPL - overall_min) %>% 
   group_by(year, rca, grp, Month, Day) %>%
   summarize(
+    min_threshold = median(overall_min),
     spl50 = median(SPL),
     rmsspl = sqrt(mean(SPL^2)),
     spl01 = quantile(SPL, .01),
@@ -175,6 +189,14 @@ if (!require(weathercan)) devtools::install_github("ropensci/weathercan")
 
 wthr19 <- weathercan::weather_dl(station_ids = 29411, start = "2019-04-14", end = "2019-06-25")
 wthr20 <- weathercan::weather_dl(station_ids = 29411, start = "2020-04-19", end = "2020-06-20")
+
+# # attempt to get Halibut bank weather data... doesn't appear to be archived and accessible
+# wave19 <- weathercan::weather_dl(station_ids = 46146, start = "2019-04-14", end = "2019-06-25")
+# wave20 <- weathercan::weather_dl(station_ids = 46146, start = "2020-04-19", end = "2020-06-20")
+
+
+rnoaa::buoy(dataset = 'cwind', buoyid = 46146, year = 2019)
+
 
 # add weather by day
 wthr <- bind_rows(wthr19, wthr20) %>%
@@ -286,7 +308,8 @@ hr_wthr1.20 <- hr_wthr %>%
 
 hr_wthr2.19 <- hr_wthr %>%
   filter(date >= as.Date("2019-05-20") & date < as.Date("2019-06-01")) %>%
-  mutate(period = "pre-ferry", 
+  mutate(
+    period = "pre-ferry", 
     position = if_else(rca== "in", "fixed1", "fixed2")
   ) %>%
   arrange(date) %>%
@@ -296,7 +319,8 @@ hr_wthr2.19 <- hr_wthr %>%
 
 hr_wthr2.20 <- hr_wthr %>%
   filter(date >= as.Date("2020-05-20") & date < as.Date("2020-06-01")) %>%
-  mutate(period = "pre-ferry",
+  mutate(
+    period = "pre-ferry",
     position = if_else(rca== "in", "drop3", "drop4")
   ) %>%
   arrange(date) %>%
@@ -306,7 +330,8 @@ hr_wthr2.20 <- hr_wthr %>%
 
 hr_wthr3.19 <- hr_wthr %>%
   filter(date >= as.Date("2019-06-01") & date <= as.Date("2019-06-25")) %>%
-  mutate(period = "with-ferry", 
+  mutate(
+    period = "with-ferry", 
     position = if_else(rca== "in", "fixed1", "fixed2")
   ) %>%
   arrange(date) %>%
@@ -316,7 +341,8 @@ hr_wthr3.19 <- hr_wthr %>%
 
 hr_wthr3.20 <- hr_wthr %>%
   filter(date >= as.Date("2020-06-01") & date <= as.Date("2020-06-25")) %>%
-  mutate(period = "with-ferry",
+  mutate(
+    period = "with-ferry",
     position = if_else(rca== "in", "drop3", "drop4")
     ) %>%
   arrange(date) %>%
