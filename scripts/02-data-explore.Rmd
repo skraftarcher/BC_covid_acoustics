@@ -20,6 +20,12 @@ theme_set(gfplot:::theme_pbs())
 # sound pressure and weather data 
 daily <- readRDS(here::here("wdata/trimmed_daily_weather.rds"))
 hourly <- readRDS(here::here("wdata/trimmed_hourly_weather.rds"))
+
+hourly$hrseq <- ((as.numeric(hourly$datehr) - min(as.numeric(hourly$datehr))+ 3600)/3600)  
+hourly$hrseq
+hourly$hrseq.f <- as.factor((as.numeric(hourly$datehr) - min(as.numeric(hourly$datehr))+ 3600)/3600)  
+hourly$hr.c <- (hourly$hr)-12
+hourly$spl50
 ```
 
 ```{r eval = FALSE, include = FALSE}
@@ -40,6 +46,25 @@ hourly %>%
 # daily %>% glimpse()
 hourly %>% glimpse()
 ```
+
+```{r}
+hist(hourly$spl50, breaks = 20)
+```
+
+```{r}
+hourly %>% 
+  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
+  geom_smooth(method = "lm") +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_wrap(~rca) +
+  xlab ("Wind speed") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  ylab("Median hourly sound pressure") +
+  ggtitle("Soundscape at night ('out' is closer to shore)")
+```
+
+
 ## Check for effect of wind speed at quietest time of night
 Noisier at RCA out... maybe because closer to shore?
 
@@ -136,7 +161,7 @@ hourly %>% filter(
   ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
   # geom_violin() +
   geom_boxplot() +
-  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  EnvStats::stat_n_text(y.pos = 32, alpha = 0.5) + 
   # geom_jitter(alpha=0.2) +
   facet_wrap(~rca, nrow = 2) +
   # facet_wrap(~grp, nrow = 2) +
@@ -159,7 +184,7 @@ hourly %>% filter(
   #  geom_violin(aes(y = spl95, x = as.factor(period), colour = as.factor(year)), inherit.aes = F) +
   #  geom_violin(aes(y = spl05, x = as.factor(period), colour = as.factor(year)), inherit.aes = F) +
    geom_boxplot(alpha = 0.5) +
-  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  EnvStats::stat_n_text(y.pos = 28, alpha = 0.5) + 
   # geom_jitter(alpha=0.2) +
   facet_wrap(~rca, nrow = 2) +
   # facet_wrap(~grp, nrow = 2) +
@@ -182,7 +207,7 @@ hourly %>% filter(
   ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
   # geom_violin() +
   geom_boxplot( outlier.alpha = 0) +
-  EnvStats::stat_n_text(y.pos = 118, alpha = 0.5) + 
+  EnvStats::stat_n_text(y.pos = 28, alpha = 0.5) + 
   geom_point(position = position_jitterdodge(), alpha=0.2) +
   facet_wrap(~rca, nrow = 2) +
   # facet_wrap(~grp, nrow = 2) +
@@ -196,6 +221,25 @@ hourly %>% filter(
 ## Explore the effect of wind direction at both sites
 All directions also noisier at RCA out
 But hopefully we can ignore direction if calm 
+
+```{r}
+
+hourly %>% filter(
+  wspeed > 10 # ~ 5 knots
+) %>% 
+  # mutate(wdirN = wdir-27, wdirN = if_else(wdirN == - 18, 0, wdirN)) %>%
+  ggplot(aes(y = spl50, x = wdir)) +
+  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
+  geom_point(alpha = 0.2, size = 2) +
+  facet_grid(rca~period, scales = "free") +
+  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
+  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  # xlab ("Time of day") +
+  ylab("Median hourly sound pressure") +
+  ggtitle("Changes with wind direction")
+```
+
+
 ```{r}
 # N or NW winds
 hourly %>% filter(
@@ -341,16 +385,18 @@ ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
 # Control for potential differences in each drop using mixed model
 
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) + (1|md) + (1|mdh)
-  , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) + (1|ymdh)
+  , data = filter(hourly, wspeed < 20 
+    # & hr >= 9 & hr <= 17
+    ))
 summary(m)
 ```
 
 Add in windy times, while controling for wind speed to increase sample size
 Now all periods are significant!
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) + (1|mdh) #+ (1|md)
-  , data = filter(hourly, wspeed < 30 & hr >= 9 & hr <= 17))
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) + (1|ymdh) #+ (1|md)
+  , data = filter(hourly, wspeed < 40 & hr >= 9 & hr <= 17))
 summary(m)
 ```
 
@@ -369,3 +415,87 @@ m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) + (1|m
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
 summary(m)
 ```
+
+
+### TRY WITH TEMPORAL AR1
+
+```{r}
+mAR1 <- glmmTMB::glmmTMB(spl95 ~ period * as.factor(year) + 
+    # period * rca +  
+    # as.factor(year) * rca + 
+    (1|position) +  
+    (1|rca) +
+    # ar1(datehr-1|rca),
+    # ar1(ymdh-1|rca),    
+    ar1(ymdh-1|position),
+  data = filter(hourly, wspeed < 20), family=gaussian)
+
+summary(mAR1)
+# brms::brm(mAR1)
+```
+
+
+
+```{r}
+
+mAR1 <- glmmTMB::glmmTMB(spl50 ~ period * as.factor(year) + wspeed +
+        poly(hr.c, 2) +
+    # period * rca +  
+    # as.factor(year) * rca + 
+    (1|position) +  
+    (1|rca) +
+    # ar1(datehr-1|rca),
+    # ar1(ymdh-1|rca),    
+    ar1(hrseq.f-1|position),  
+    # ar1(ymdh-1|position),
+  data = filter(hourly, wspeed < 20), family=gaussian)
+
+summary(mAR1)
+# brms::brm(mAR1)
+```
+
+
+```{r}
+mAR1$frame$resid <- residuals(mAR1)
+mAR1$frame$est <- predict(mAR1)
+
+ggplot(filter(mAR1$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() 
+  # facet_grid(period~year.f)
+```
+
+
+
+Doesnt't converge with all data and wind speed as covariate with random slopes
+
+```{r eval = T}
+hourly2 <- hourly %>% select(-wdir) %>% drop_na()
+hourly2$year.f <- as.factor(hourly2$year)
+
+mAR1 <- glmmTMB::glmmTMB(spl50 ~ period * year.f + wspeed + 
+    # poly(wspeed, 2) + 
+    poly(hr.c, 2) +
+    (1|rca) +
+    # (poly(wdir, 2)|rca) + # missing values?
+    # (poly(hr.c, 2)|rca) +
+    # (poly(wspeed, 2)|rca) +
+    # us(hrseq.f-1|position),  # crashes R
+    ar1(hrseq.f-1|position),  
+    # ar1(ymdh-1|position),
+  data = filter(hourly2), 
+  # REML = T,
+  family=gaussian)
+```
+
+```{r}
+summary(mAR1)
+```
+
+```{r}
+mAR1$frame$resid <- residuals(mAR1)
+mAR1$frame$est <- predict(mAR1)
+
+ggplot(filter(mAR1$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_wrap(~year.f)
+  # facet_grid(period~year.f)
+```
+
