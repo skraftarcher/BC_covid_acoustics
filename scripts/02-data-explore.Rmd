@@ -464,8 +464,39 @@ ggplot(filter(mAR1$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_sm
 ```
 
 
+```{r}
+apr2019 <- mAR1$fit$par[[1]]
+may2019 <- mAR1$fit$par[[1]]+mAR1$fit$par[[2]]
+june2019 <- mAR1$fit$par[[1]]+mAR1$fit$par[[3]]
+
+apr2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[4]]
+may2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[2]]+mAR1$fit$par[[4]]+mAR1$fit$par[[8]]
+june2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[3]]+mAR1$fit$par[[4]]+mAR1$fit$par[[9]]
+
+
+```
+
+% drop from 2019 in sound pressure levels (dB) during BC covid shutdown Phase I
+
+```{r}
+100 - round((apr2020/apr2019)*100)
+```
+
+rebound to % of 2019 sound pressure levels during BC covid shutdown early Phase II
+
+```{r}
+round((may2020/may2019)*100)
+```
+
+rebound to % of 2019 sound pressure levels during BC covid shutdown late Phase II
+
+```{r}
+round((june2020/(june2019))*100)
+```
 
 Doesnt't converge with all data and wind speed as covariate with random slopes
+
+Can add in all wind speeds but residuals look pretty bad...
 
 ```{r eval = T}
 hourly2 <- hourly %>% select(-wdir) %>% drop_na()
