@@ -41,11 +41,5 @@ for(i in 1:nrow(in19)){
   in19$stfile[i]<-r19in2[in19$DateTime[i] %within% r19in2$tint,1]
 }
 
-<<<<<<< HEAD
 
-=======
-lf<-function(x,y){
-  z<-match(x,y)
-}
->>>>>>> 20bc5297d188476c06f7f22835959e68958270e5
                 
