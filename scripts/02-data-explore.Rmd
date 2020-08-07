@@ -54,14 +54,16 @@ hist(hourly$spl50, breaks = 20)
 ```{r}
 hourly %>% 
   ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
-  geom_smooth(method = "lm") +
+  # geom_smooth(method = "lm") +
+  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
   geom_point(alpha = 0.2, size = 2) +
   facet_wrap(~rca) +
   xlab ("Wind speed") +
   scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ylab("Median hourly sound pressure") +
-  ggtitle("Soundscape at night ('out' is closer to shore)")
+  ggtitle("Soundscape ('in' is at 12m depth; 'out' is only 10m and closer to shore)")
+
 ```
 
 
@@ -74,30 +76,35 @@ hourly %>% filter(
   hr < 4 & hr > 0
 ) %>%
   ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
-  geom_smooth(method = "lm") +
+  # geom_smooth(method = "lm") +
+  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
   geom_point(alpha = 0.2, size = 2) +
   facet_wrap(~rca) +
   xlab ("Wind speed") +
   scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ylab("Median hourly sound pressure") +
-  ggtitle("Soundscape at night ('out' is closer to shore)")
+  ggtitle("Soundscape in wee hours of night")
+
 ```
 
 ### Wind speed under 20 km/hr seems acceptable 
 ```{r}
 # wind speed under 20 seems acceptable 
-hourly %>% filter(
-  # (hr < 4 | hr > 10),
+hourly %>% filter( hr < 4 & hr > 0 &
   wspeed < 20 # ~ 10 knots
   ) %>%
-  ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
+  ggplot(aes(y = spl50, x = wspeed
+    , color = rca, fill = rca
+    #, color = as.factor(year), fill = as.factor(year)
+    )) +
   geom_smooth(method = "lm") +
+  # geom_smooth(method= "lm", formula = y~x + I(x^2)) + # doesn't work for under 20 km
   geom_point(alpha = 0.2, size = 2) +
-  facet_grid(rca~period, scales = "free")+
+  # facet_grid(rca~period, scales = "free")+
   xlab ("Wind speed") +
-  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
-  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
+  scale_fill_manual(name= "RCA",values = c("#00AFBB", "#E7B800" ))+ #"#E7B800",
+  scale_color_manual(name= "RCA",values = c("#00AFBB", "#E7B800"))+
   ylab("Median hourly sound pressure") +
   ggtitle("Soundscape when wind speed <20 km/hr")
 ```
@@ -105,7 +112,7 @@ hourly %>% filter(
 ```{r}
 hourly %>% filter(
   (hr < 4 | hr > 10), # at night only
-  wspeed < 10 # ~ 5 knots
+  wspeed < 20 # ~ 5 knots
   ) %>%
   ggplot(aes(y = spl50, x = wspeed, color = as.factor(year), fill = as.factor(year))) +
   geom_smooth(method = "lm") +
@@ -115,26 +122,10 @@ hourly %>% filter(
   scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   ylab("Median hourly sound pressure") +
-  ggtitle("Soundscape at night when wind speed <10 km/hr")
+  ggtitle("Soundscape at night when wind speed <20 km/hr")
 ```
 
 ## What time of day is noisiest?
-```{r}
-# time of day
-hourly %>% filter(
-  wspeed < 10 # ~ 5 knots
-) %>%
-  ggplot(aes(y = spl50, x = hr, color = as.factor(year), fill = as.factor(year))) +
-  geom_smooth(method= "lm", formula = y~x + I(x^2)) +
-  geom_point(alpha = 0.2, size = 2) +
-  facet_grid(rca~period, scales = "free") +
-  scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
-  scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
-  xlab ("Time of day") +
-  ylab("Median hourly sound pressure") +
-  ggtitle("Changes through the day when wind speed <10 km/hr")
-```
-
 ```{r }
 hourly %>% filter(
   wspeed < 20 # ~ 10 knots
@@ -156,7 +147,7 @@ hourly %>% filter(
 hourly %>% filter(
   # hr >= 9 & hr <= 17, # between 9-5; busiest
   # hr < 4 & hr > 2, # between 2-4 am; quietest 
-  wspeed < 10
+  wspeed < 20
 ) %>%
   ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
   # geom_violin() +
@@ -169,7 +160,7 @@ hourly %>% filter(
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   xlab("Time period") +
   ylab("Median hourly sound pressure") +
-  ggtitle("Soundscape differences with COVID when wind < 10 km/hr")
+  ggtitle("Soundscape differences with COVID when wind < 20 km/hr")
 ```
 
 ```{r}
@@ -202,7 +193,7 @@ hourly %>% filter(
 hourly %>% filter(
   hr >= 9 & hr <= 17, # between 9-5; busiest
   # hr < 4 & hr > 2, # between 2-4 am; quietest 
-  wspeed < 10
+  wspeed < 20
 ) %>%
   ggplot(aes(y = spl50, x = as.factor(period), color = as.factor(year))) +
   # geom_violin() +
@@ -215,15 +206,14 @@ hourly %>% filter(
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
   xlab("Time period") +
   ylab("Median hourly sound pressure") +
-  ggtitle("Soundscape daytime differences with COVID when wind < 10 km/hr")
+  ggtitle("Soundscape daytime differences with COVID when wind < 20 km/hr")
 ```
 
 ## Explore the effect of wind direction at both sites
 All directions also noisier at RCA out
 But hopefully we can ignore direction if calm 
 
-```{r}
-
+```{r include = F, eval=F}
 hourly %>% filter(
   wspeed > 10 # ~ 5 knots
 ) %>% 
@@ -292,8 +282,9 @@ hourly %>% filter(
   ggtitle("SW OR W winds")
 ```
 
+
+```{r include=F, eval=F}
 # ANOVA
-```{r}
 m <- aov(spl50 ~ 
     position + # unique intercepts for each location 
     period * as.factor(year) +# time variables interacting?
@@ -302,7 +293,7 @@ m <- aov(spl50 ~
 summary(m)
 ```
 
-```{r}
+```{r include=F, eval=F}
 m <- aov(spl50 ~ 
     period * as.factor(year) + # year and postition are confounded
     period * rca # site difference might vary seasonally?
@@ -312,46 +303,29 @@ TukeyHSD(m)
 ```
 
 
+```{r include=F, eval=F}
 # ANCOVA
-```{r}
 # add daily curve 
 m <- lm(spl50 ~ poly(hr, 2) + period * as.factor(year) + period * rca, 
   data = filter(hourly, wspeed < 20))
 summary(m)
 ```
 
-but the shape of daily curve does interact with year and period
-```{r}
+```{r include=F, eval=F}
 # but the shape of daily curve does interact with year and period
 m <- lm(spl50 ~ poly(hr, 2) * period * as.factor(year) + period * rca, 
   data = filter(hourly, wspeed < 20))
 summary(m)
 ```
 
-so extract noisiest period only 
-```{r}
+```{r include=F, eval=F}
 # so extract noisiest period only 
 m <- lm(spl50 ~ period * as.factor(year) + period * rca
   , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
 summary(m)
 ```
 
-What about the quietest 5th?
-```{r}
-m <- lm(spl05 ~ period * as.factor(year) + period * rca
-  , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
-summary(m)
-```
-
-What about the noisiest 5th?
-```{r}
-m <- lm(spl95 ~ period * as.factor(year) + period * rca
-  , data = filter(hourly, wspeed < 10 & hr >= 9 & hr <= 17))
-summary(m)
-```
-
-
-Time continuous plot
+Time continuous plot:
 In full data set there is some temporal autocorrelation that we would need to control for
 ```{r}
 hourly %>% 
@@ -360,7 +334,7 @@ ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
   geom_line(alpha = 0.5)+
   scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
-  coord_cartesian(ylim = c(90, 120))+
+  # coord_cartesian(ylim = c(90, 120))+
   facet_grid(rca~period, scales="free") +
   xlab("Time")
 ```
@@ -368,26 +342,24 @@ ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
 Still quite a bit in the daytime low wind version 
 ```{r}
 hourly %>% filter( 
-  wspeed < 20 & hr >= 9 & hr <= 17
+  wspeed < 20 #& hr >= 9 & hr <= 17
   ) %>%
 ggplot(aes(y=spl50, x=mdh, color=as.factor(year), group=grp))+
   geom_point(alpha = 0.8)+
   geom_line(alpha = 0.2)+
   scale_fill_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+ #"#E7B800",
   scale_color_manual(name= "Year",values = c("#FC4E07", "#00AFBB"))+
-  coord_cartesian(ylim = c(90, 120))+
+  # coord_cartesian(ylim = c(90, 120))+
   facet_grid(rca~period, scales="free") +
   xlab("Time")
 ```
 
 
-
-# Control for potential differences in each drop using mixed model
-
+### Control for potential differences in each drop using mixed model
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + (1|position) + (1|ymdh)
-  , data = filter(hourly, wspeed < 20 
-    # & hr >= 9 & hr <= 17
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca + 
+    (1|position) + (1|ymdh), 
+    data = filter(hourly, wspeed < 20 
     ))
 summary(m)
 ```
@@ -395,23 +367,25 @@ summary(m)
 Add in windy times, while controling for wind speed to increase sample size
 Now all periods are significant!
 ```{r}
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) + (1|ymdh) #+ (1|md)
-  , data = filter(hourly, wspeed < 40 & hr >= 9 & hr <= 17))
+m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * wspeed + (1|position) + (1|ymdh) 
+  , data = filter(hourly, wspeed < 40 #& hr >= 9 & hr <= 17
+    ))
 summary(m)
 ```
 
 ### Are quietest times quieter?
 ```{r}
-m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca + (1|position)+ (1|md), 
+m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca + (1|position)+ (1|ymdh), 
   # data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
   data = filter(hourly, wspeed < 20 & hr < 4 & hr > 0))
 summary(m)
 ```
 
+
 ### Are noisiest times quieter? 
 Not significantly
 ```{r}
-m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) + (1|md)
+m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + rca + (1|position) + (1|ymdh)
   , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
 summary(m)
 ```
@@ -420,85 +394,20 @@ summary(m)
 ### TRY WITH TEMPORAL AR1
 
 ```{r}
-mAR1 <- glmmTMB::glmmTMB(spl95 ~ period * as.factor(year) + 
-    # period * rca +  
-    # as.factor(year) * rca + 
+mAR1 <- glmmTMB::glmmTMB(spl50 ~ period * as.factor(year) + 
     (1|position) +  
     (1|rca) +
-    # ar1(datehr-1|rca),
-    # ar1(ymdh-1|rca),    
-    ar1(ymdh-1|position),
+    ar1(hrseq.f-1|position),
   data = filter(hourly, wspeed < 20), family=gaussian)
 
 summary(mAR1)
-# brms::brm(mAR1)
 ```
 
 
+Include wind speed and centred quadratic hr of the day 
+(Doesnt't converge with all data and wind speed as covariate with random slopes)
 
 ```{r}
-
-mAR1 <- glmmTMB::glmmTMB(spl50 ~ period * as.factor(year) + wspeed +
-        poly(hr.c, 2) +
-    # period * rca +  
-    # as.factor(year) * rca + 
-    (1|position) +  
-    (1|rca) +
-    # ar1(datehr-1|rca),
-    # ar1(ymdh-1|rca),    
-    ar1(hrseq.f-1|position),  
-    # ar1(ymdh-1|position),
-  data = filter(hourly, wspeed < 20), family=gaussian)
-
-summary(mAR1)
-# brms::brm(mAR1)
-```
-
-
-```{r}
-mAR1$frame$resid <- residuals(mAR1)
-mAR1$frame$est <- predict(mAR1)
-
-ggplot(filter(mAR1$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() 
-  # facet_grid(period~year.f)
-```
-
-
-```{r}
-apr2019 <- mAR1$fit$par[[1]]
-may2019 <- mAR1$fit$par[[1]]+mAR1$fit$par[[2]]
-june2019 <- mAR1$fit$par[[1]]+mAR1$fit$par[[3]]
-
-apr2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[4]]
-may2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[2]]+mAR1$fit$par[[4]]+mAR1$fit$par[[8]]
-june2020 <- mAR1$fit$par[[1]]+mAR1$fit$par[[3]]+mAR1$fit$par[[4]]+mAR1$fit$par[[9]]
-
-
-```
-
-% drop from 2019 in sound pressure levels (dB) during BC covid shutdown Phase I
-
-```{r}
-100 - round((apr2020/apr2019)*100)
-```
-
-rebound to % of 2019 sound pressure levels during BC covid shutdown early Phase II
-
-```{r}
-round((may2020/may2019)*100)
-```
-
-rebound to % of 2019 sound pressure levels during BC covid shutdown late Phase II
-
-```{r}
-round((june2020/(june2019))*100)
-```
-
-Doesnt't converge with all data and wind speed as covariate with random slopes
-
-Can add in all wind speeds but residuals look pretty bad...
-
-```{r eval = T}
 hourly2 <- hourly %>% select(-wdir) %>% drop_na()
 hourly2$year.f <- as.factor(hourly2$year)
 
@@ -508,12 +417,12 @@ mAR1 <- glmmTMB::glmmTMB(spl50 ~ period * year.f + wspeed +
     (1|rca) +
     # (poly(wdir, 2)|rca) + # missing values?
     # (poly(hr.c, 2)|rca) +
-    # (poly(wspeed, 2)|rca) +
+    # (poly(wspeed, 2)|rca,
     # us(hrseq.f-1|position),  # crashes R
     ar1(hrseq.f-1|position),  
     # ar1(ymdh-1|position),
-  data = filter(hourly2), 
-  # REML = T,
+  data = filter(hourly2, wspeed < 10), 
+  REML = T,
   family=gaussian)
 ```
 
@@ -530,3 +439,190 @@ ggplot(filter(mAR1$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_sm
   # facet_grid(period~year.f)
 ```
 
+
+```{r}
+hourly2 <- hourly %>% select(-wdir) %>% drop_na()
+hourly2$year.f <- as.factor(hourly2$year)
+
+mAR30 <- glmmTMB::glmmTMB(spl50 ~ 0 + rca * wspeed + period * year.f + 
+    # poly(wspeed, 2) +
+    poly(hr.c, 2) +
+    (1|rca) +
+    # (poly(wdir, 2)|rca) + # missing values?
+    # (poly(hr.c, 2)|rca) +
+    # (wspeed|rca) +
+    (wspeed|position) +
+    # us(hrseq.f-1|position),  # crashes R
+    ar1(hrseq.f-1|position),  
+    # ar1(ymdh-1|position),
+  data = filter(hourly2, wspeed < 30), 
+  REML = T,
+  family=gaussian)
+```
+
+```{r}
+summary(mAR30)
+```
+
+```{r}
+mAR30$frame$resid <- residuals(mAR30)
+mAR30$frame$est <- predict(mAR30)
+
+ggplot(filter(mAR30$frame), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(rca~year.f, scales = "free")
+  # facet_grid(period~year.f)
+```
+
+
+```{r }
+library(nlme)
+
+mnlme <- lme(spl50 ~ period * year.f + poly(wspeed,2) + poly(hr.c, 2),
+    random = list(~1|position, ~1|rca), 
+             data = filter(hourly2#, wspeed < 30
+               ))
+summary(mnlme)
+ACF(mnlme,
+    form = ~ hrseq.f|position)  
+
+ACF(mnlme,
+    form = ~ datehr|position)
+
+mnlme2 <- lme(spl50 ~ period * year.f + poly(wspeed,2)*rca + poly(hr.c, 2)*rca,
+    random = list(~1|position, ~1|rca), 
+             data = filter(hourly2#, wspeed < 30
+               ))
+summary(mnlme2)
+ACF(mnlme2,
+    form = ~ datehr|position)
+```
+
+
+```{r eval = F}
+mGLS <- lme(spl50 ~ period * year.f + poly(hr.c, 2) + poly(wspeed,2)
+  , random = list(~1|position), 
+  correlation = corAR1(form = ~ datehr|position,  value = 0.49), 
+  # method="REML",
+  data = filter(hourly2)
+  )
+mGLS$data$resid <- residuals(mGLS)
+mGLS$data$est <- predict(mGLS)
+
+saveRDS(mGLS, file = "models/spl50-gls-no-rca.rds")
+```
+
+```{r}
+mGLS <- readRDS("models/spl50-gls-no-rca.rds")
+summary(mGLS)
+```
+AIC 27417.22
+
+```{r eval = F}
+mGLSrca <- lme(spl50 ~ period * year.f + poly(hr.c, 2) * rca + poly(wspeed, 2) * rca
+  , random = list(~1|position), 
+  correlation = corAR1(form = ~ datehr|position,  value = 0.49), 
+  # method="REML",
+  data = filter(hourly2)
+  )
+mGLSrca$data$resid <- residuals(mGLSrca)
+mGLSrca$data$est <- predict(mGLSrca)
+
+saveRDS(mGLSrca, file = "models/spl50-gls-w-rca2.rds") 
+```
+
+```{r}
+mGLSrca <- readRDS("models/spl50-gls-w-rca2.rds")
+summary(mGLSrca)
+```
+
+AIC 
+only wind interacts with rca: 27384.65	
+both interact with rca: 27360.28
+
+```{r}
+coef(summary(mGLSrca))
+```
+
+# Models without winds > 20 km 
+better with no effect of wind at these levels
+
+```{r eval = F}
+mGLS20 <- lme(spl50 ~ period * year.f + #wspeed + 
+    poly(hr.c, 2) * rca, 
+     random = list(~1|position), 
+  correlation = corAR1(form = ~ datehr|position,  value = 0.43), 
+  # method="REML",
+  data = filter(hourly2, wspeed < 20)
+  )
+mGLS20$data$resid <- residuals(mGLS20)
+mGLS20$data$est <- predict(mGLS20)
+
+
+saveRDS(mGLS20, file = "models/spl50-gls-20km-no-wind.rds")
+# saveRDS(mGLS20, file = "models/spl50-gls-20km-linear.rds")
+```
+
+```{r}
+mGLS20 <- readRDS("models/spl50-gls-20km-no-wind.rds")
+# mGLS20 <- readRDS("models/spl50-gls-20km-linear.rds")
+summary(mGLS20)
+```
+AIC
+with wind: 14954.63	
+no wind : 14946.54
+
+### try also removing RCA but seems better to keep it
+```{r eval = F}
+mGLS20b <- lme(spl50 ~ period * year.f + 
+     # wspeed * rca + 
+     poly(hr.c, 2) #* rca
+  , 
+     random = list(~1|position), 
+  correlation = corAR1(form = ~ datehr|position,  value = 0.43), 
+  # method="REML",
+  data = filter(hourly2, wspeed < 20)
+  )
+mGLS20b$data$resid <- residuals(mGLS20b)
+mGLS20b$data$est <- predict(mGLS20b)
+
+saveRDS(mGLS20b, file = "models/spl50-gls-20km-wout-rca.rds")
+```
+
+```{r}
+mGLS20b <- readRDS("models/spl50-gls-20km-wout-rca.rds")
+summary(mGLS20b)
+```
+AIC
+time quad universal: 14965.05	
+vs interact with RCA: 14946.54
+
+```{r}
+coef(summary(mGLS20b))
+```
+
+
+
+```{r}
+ggplot(filter(mGLSrca$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  # facet_grid(rca~year.f, scales = "free")
+  facet_grid(year.f~rca)
+```
+
+
+```{r}
+ggplot(filter(mGLS$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  # facet_grid(rca~year.f, scales = "free")
+  facet_grid(year.f~rca)
+```
+
+```{r}
+ggplot(filter(mGLS20$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(year.f~rca, scales = "free")
+  # facet_grid(period~year.f)
+```
+
+```{r}
+ggplot(filter(mGLS20b$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(year.f~rca, scales = "free")
+  # facet_grid(period~year.f)
+```
