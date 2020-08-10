@@ -404,59 +404,9 @@ ggplot(aes(y=wspeed, x=mdh, color=as.factor(year), group=grp))+
 ```
 
 
-### Control for potential differences in each drop and date using mixed model
-```{r}
-hourly$ymd.f <- as.factor(paste0(hourly$year,"-",hourly$md))
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + 
-    (1|rca) + 
-    (1|position) + 
-    (1|ymd.f), 
-    data = filter(hourly, wspeed < 20 
-    ))
-summary(m)
-```
+# TRY WITH TEMPORAL AR1 using glmmTMB
 
-Add in windy times, while controling for wind speed to increase sample size
-Now all periods are significant!
-```{r}
-hourly2 <- hourly %>% select(-wdir) %>% drop_na()
-hourly2$year.f <- as.factor(hourly2$year)
-
-m <- lmerTest::lmer(spl50 ~ 0 + period * as.factor(year) + rca * poly(wspeed,2) + rca * poly(hr.c,2) + 
-    # (1|rca) +
-    (1|position) + 
-    (1|ymd.f)
-  , data = filter(hourly2#, wspeed < 40 #& hr >= 9 & hr <= 17
-    ))
-summary(m)
-```
-
-### Are quietest times quieter?
-```{r}
-m <- lmerTest::lmer(spl05 ~ 0 + period * as.factor(year) + rca +     
-    # (1|rca) +
-    (1|position) + 
-    (1|ymd.f), 
-  # data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
-  data = filter(hourly, wspeed < 20 & (hr < 4 | hr > 10)))
-summary(m)
-```
-
-
-### Are noisiest times quieter? 
-Not significantly
-```{r}
-m <- lmerTest::lmer(spl95 ~ period * as.factor(year) + #rca +     
-    (1|rca) +
-    (1|position) + 
-    (1|ymd.f)
-  , data = filter(hourly, wspeed < 20 & hr >= 9 & hr <= 17))
-summary(m)
-```
-
-
-### TRY WITH TEMPORAL AR1
-
+### first for winds less than 20 km per hour
 ```{r}
 hourly2$site <- paste0("RCA", hourly2$rca)
 hourly2$deployment <-  hourly2$position
@@ -466,14 +416,14 @@ hourly2$wind_speed <- hourly2$wspeed
 
 hourlySPLdata <- hourly2
 
-
 mAR120 <- glmmTMB::glmmTMB(spl50 ~ phase * year + poly(timeofday, 2) + site + 
-    (1|deployment) + ar1(time-1|deployment),
+    (1|deployment) + 
+    # us(time-1|position), #crashed computer !
+    ar1(time-1|deployment),
   data = filter(hourlySPLdata, wind_speed < 20), family=gaussian)
 
 summary(mAR120)
 ```
-
 ```{r}
 mAR120$frame$resid <- residuals(mAR120, type = "pearson")
 mAR120$frame$est <- predict(mAR120)
@@ -484,12 +434,11 @@ ggplot(mAR120$frame, aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth()
 ggplot(mAR120$frame, aes(`poly(timeofday, 2)`[,1], resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
   facet_grid(site~year, scales = "free")
 
-acf(mAR120$frame, resType = "normalized")
+acf(mAR120$frame$resid, resType = "pearson")
 
-
-plot(effects::Effect(c("hr.c", "rca"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("hr.c", "year"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("hr.c", "phase"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed"))
+plot(effects::Effect(c("timeofday", "site"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+plot(effects::Effect(c("timeofday", "year"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+plot(effects::Effect(c("timeofday", "phase"), mAR120, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
 ```
 
 ```{r}
@@ -505,56 +454,92 @@ acf(din19$resid, lag = 20)
 acf(dout19$resid, lag = 20)
 
 acf(din$resid, lag = 20)
-
-dout <- filter(mAR120$frame,  site == "RCAout" & year == 2020 & phase == "I") %>% arrange(time) 
 acf(dout$resid, lag = 20)
 
-mAR120$frame$resid <- residuals(mGLS20, type = "normalized")
+mAR120$frame$resid <- residuals(mAR120, type = "pearson")
 d <- filter(mAR120$frame) %>% arrange(time) 
 acf(d$resid, lag = 40)
 ```
 
-
-
-Include wind speed and centred quadratic hr of the day 
-(Doesnt't converge with all data and wind speed as covariate with random slopes)
+### include all data so as not to violate AR1 assumptions
 
 ```{r}
-mAR1 <- glmmTMB::glmmTMB(spl50 ~ phase * year + 
-    poly(wspeed, 2) * rca +
-    # poly(hr.c, 2) + rca +
-    poly(hr.c, 2) +
-    # (1|rca) +
-    # (poly(wdir, 2)|rca) + # missing values?
-    # (poly(hr.c, 2)|rca) +
-    # (poly(wspeed, 2)|rca,
-    # us(hrseq.f-1|position),  # crashes R
-    # ar1(datehr-1|position),  
-    ar1(hrseq.f-1|position),
-  data = filter(hourly2
-    ), 
-  REML = T,
-  family=gaussian)
+hourly2$site <- paste0("RCA", hourly2$rca)
+hourly2$deployment <-  hourly2$position
+hourly2$time <- hourly2$hrseq.f
+hourly2$timeofday <- hourly2$hr.c
+hourly2$log_wind_speed <- log(hourly2$wspeed+1)
+hourly2$wind_speed <- (hourly2$wspeed)
 
-mAR1$frame$resid <- residuals(mAR1, type = "pearson")
-mAR1$frame$est <- predict(mAR1)
-```
+hourlySPLdata <- hourly2
 
-```{r}
+
+mAR1 <- glmmTMB::glmmTMB(spl50 ~ year * phase + 
+    poly(timeofday, 2) + 
+    # poly(timeofday, 2) * site + 
+    poly(wind_speed, 2) * site +
+    # log_wind_speed * site +
+    (1|deployment) + 
+    ar1(time-1|deployment),
+  data = hourlySPLdata, family=gaussian)
+
 summary(mAR1)
 ```
 
 
 ```{r}
-ggplot(mAR1$frame, aes(est, resid)) + geom_point(alpha = 0.2) + geom_smooth() + facet_grid(rca~year)
-plot(effects::Effect(c("wspeed", "rca"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("hr.c", "rca"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("hr.c", "year"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("wspeed", "year"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("hr.c", "phase"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
-plot(effects::Effect(c("wspeed", "phase"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed"))
+mAR1$frame$resid <- residuals(mAR1, type = "pearson")
+mAR1$frame$est <- predict(mAR1)
+
+ggplot(mAR1$frame, aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(phase~year)
+
+ggplot(mAR1$frame, aes(`poly(timeofday, 2)`[,1], resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(~deployment, scales = "free")
+
+ggplot(mAR1$frame, aes(`poly(wind_speed, 2)`[,1], resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(~deployment, scales = "free")
+
+ggplot(mAR1$frame, aes(`poly(wind_speed, 2)`[,2], resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
+  facet_grid(~deployment, scales = "free")
+
+# acf(mAR1$frame, resType = "pearson")
+
+effects::Effect(c("site", "year"), mAR1, residuals=TRUE)
+
+plot(effects::Effect(c("year", "site"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+plot(effects::Effect(c("timeofday", "year"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+plot(effects::Effect(c("wind_speed", "phase"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+# plot(effects::Effect(c("log_wind_speed", "site"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+
+# plot(effects::Effect(c("wind_speed", "deployment"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
+plot(effects::Effect(c("wind_speed", "site"), mAR1, residuals=TRUE), partial.residual=list(lty="dashed", col= "black"))
 ```
 
+```{r}
+din19 <- filter(mAR1$frame, site == "RCAin" & year == 2019 & phase == "I") %>% arrange(time) 
+dout19 <- filter(mAR1$frame,  site == "RCAout" & year == 2019 & phase == "I") %>% arrange(time) 
+
+din <- filter(mAR1$frame,  site == "RCAin" & year == 2020 & phase == "I") %>% arrange(time) 
+dout <- filter(mAR1$frame,  site == "RCAout" & year == 2020 & phase == "I") %>% arrange(time) 
+
+acf(din19$resid, lag = 20)
+acf(dout19$resid, lag = 20)
+
+acf(din$resid, lag = 20)
+
+dout <- filter(mAR1$frame,  site == "RCAout" & year == 2020 & phase == "I") %>% arrange(time) 
+acf(dout$resid, lag = 20)
+
+mAR1$frame$resid <- residuals(mAR1, type = "pearson")
+d <- filter(mAR1$frame) %>% arrange(time) 
+acf(d$resid, lag = 40)
+```
+
+
+# TRY NLME approach
+### uses data variable, but not sure how
+### adding different lags not changing anything
 
 ```{r }
 mnlme <- lme(spl50 ~ phase * year + poly(wspeed,2)*rca + poly(hr.c, 2)*rca,
@@ -672,7 +657,7 @@ saveRDS(mGLS20, file = "models/spl50-gls-20km-no-wind-p3-q1.rds")
 # mGLS20 <- readRDS("models/spl50-gls-20km-linear.rds")
 
  mGLS20 <- readRDS("models/spl50-gls-20km-no-wind.rds")
- mGLS20 <- readRDS("models/spl50-gls-20km-no-wind-p3-q1.rds")
+ # mGLS20 <- readRDS("models/spl50-gls-20km-no-wind-p3-q1.rds")
 summary(mGLS20)
 ```
 AIC
@@ -753,7 +738,7 @@ ggplot(., aes(datehr, resid)) +
   facet_grid(rca~year.f, scales = "free")
 ```
 
-```{r}
+```{r eval=F}
 din19 <- filter(mGLS20$data, rca == "in" & year == 2019 & phase == "I") %>% arrange(datehr) 
 dout19 <- filter(mGLS20$data, rca == "out" & year == 2019 & phase == "I") %>% arrange(datehr) 
 
@@ -771,7 +756,7 @@ acf(dout$resid, lag = 20)
 d <- filter(mGLS20$data) %>% arrange(rca, datehr) 
 
 acf(d$resid, lag = 40)
-mGLS20$data$resid2 <- residuals(mGLS20b, type = "normalized")
+mGLS20$data$resid2 <- residuals(mGLS20, type = "normalized")
 
 plot(ACF(mGLS20, resType = "normalized", group = "year"))
 ```
@@ -779,7 +764,7 @@ plot(ACF(mGLS20, resType = "normalized", group = "year"))
 
 
 without RCA
-```{r}
+```{r eval = F}
 mGLS20b$data$resid <- residuals(mGLS20b, type = "normalized")
 ggplot(filter(mGLS20b$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_smooth() + 
   facet_grid(year.f~rca, scales = "free")
@@ -789,7 +774,7 @@ ggplot(filter(mGLS20b$data), aes(est, resid)) + geom_point(alpha = 0.2)  + geom_
 
 
 
-```{r}
+```{r eval = F}
 hourly2$time <- as.numeric(hourly2$datehr)
 min(hourly2$time)
 hourly2$time <- hourly2$time - min(hourly2$time)
@@ -810,7 +795,7 @@ mgcv::gam.check(gam1)
 
 
 
-```{r}
+```{r eval = F}
 gam2 <- gamm4::gamm4(
 # gam2 <-mgcv::gam(
   spl50 ~
@@ -831,7 +816,7 @@ summary(gam2$mer)
 # summary(gam2)
 ```
 
-```{r}
+```{r eval = F}
 plot(gam2$gam, shade = TRUE, ylim = c(-6,8)) 
 
 plot(gam2$mer)
@@ -848,7 +833,7 @@ acf(d$gam_resids2, lag = 30)
 
 
 wind less than 20 km and RCA * hr
-```{r}
+```{r eval = F}
 hourly2$gamresid <- gam2$gam$residuals
 hourly2$gamest <-gam2$gam$fitted.values
 
@@ -858,7 +843,7 @@ ggplot(hourly2, aes(gamest, gamresid)) + geom_point(alpha = 0.2)  +
 ```
 
 
-```{r}
+```{r eval = F}
 ggplot(hourly2, aes(mdh, gamresid)) + 
   geom_point(alpha = 0.2)  +
   # geom_line() + 
@@ -866,7 +851,7 @@ ggplot(hourly2, aes(mdh, gamresid)) +
 ```
 
 
-```{r}
+```{r eval = F}
 hourly2 %>% filter (month == 4) %>%
 ggplot(., aes(datehr, gamresid)) + 
   geom_point(alpha = 0.2)  +
