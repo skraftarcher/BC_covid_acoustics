@@ -7,6 +7,7 @@
 if(!require(tidyverse))install.packages("tidyverse");library(tidyverse)
 if(!require(lubridate))install.packages("lubridate");library(lubridate)
 if(!require(readxl))install.packages("readxl");library(readxl)
+if(!require(filesstrings))install.packages("filesstrings");library(filesstrings)
 
 # r19in<-list.files(path = "E:/RCA_IN/April_July2019/1342218252",pattern = "*.wav")
 
@@ -68,4 +69,9 @@ in19_files <- in19_sample_days %>% mutate(
   ) %>% group_by(Week) %>% filter(file_hr == spl_hr) %>% group_by(Week, file_hr) %>% 
   mutate(min_file_time = min(dt)) %>% ungroup() %>% filter(dt == min_file_time & n_days > 4) %>% select(Week, file_hr, stfile) %>% distinct()
 
-  
+### move selected files to new folder
+### for mac, run just once
+# for (i in 1:192){
+# file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", in19_files$stfile[i]), 
+#   "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/quiet_days")
+# }
