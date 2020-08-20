@@ -21,7 +21,8 @@ in192 <- in19 %>%
   mutate(
     grp = "RCA In 2019",
     rca = "in",
-    year = 2019
+    year = 2019,
+    Deployment=19.1
   ) %>%
   filter(!(Month == 4 & Day == 10)) # day deployed
 
@@ -29,7 +30,8 @@ out192 <- out19 %>%
   mutate(
     grp = "RCA Out 2019",
     rca = "out",
-    year = 2019
+    year = 2019,
+    Deployment=19.1
   ) %>%
   filter(!(Month == 4 & Day == 10)) # day deployed
 
@@ -58,10 +60,12 @@ out202 <- out20 %>%
   )
 
 
+# save minute by minute dataset for picking out ship passages
 
+spl_min<-rbind(in192,in202,out192,out202)
 
-
-
+write_rds(spl_min,"wdata/spl_by_min.rds")
+write.csv(spl_min,"wdata/spl_by_min.cvs")
 # create a dataset that is aggregated by the hour,
 # several variables are calculated, 1,5,50,95, and 99 quantiles as well as the root mean square error
 
