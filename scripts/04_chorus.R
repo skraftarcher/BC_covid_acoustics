@@ -1,7 +1,7 @@
 #script to look at the first 48 hours in 2019
 
 #install packages----
-# devtools::install_github("maRce10/warbleR")
+# devtools::install_github("maRce10/warbleR") # can't install w R 3.6.1
 # devtools::install_github("maRce10/Rraven")
 
 #load packages----
@@ -18,11 +18,14 @@ in19q<-imp_raven(path = here("selection.tables"),
 autod<-imp_raven(path = here("selection.tables"),
                  files = "NanaimoRCA_FS_detections_raven-format_EditedCopy_05June2019.txt",
                  all.data = TRUE)
+
 colnames(autod)<-c("selection","view","channel","begin.time","end.time","low.freq",
                       "high.freq","begin.path","file.off","begin.file","species","detector","confidence",
                    "agreement","sount.type","comments","selec.file")
+
 oct19in<-imp_raven(path=here("selection.tables","RCA_In_Deployment_1"),all.data = TRUE)
 oct19out<-imp_raven(path=here("selection.tables","RCA_Out_Deployment_1"),all.data = TRUE)
+
 colnames(oct19in)<-c("selection","view","channel","begin.time","end.time","low.freq","peak.freq",
                      "high.freq","delta.time","file.off","begin.path","begin.file","class","sound.type",
                      "comments","selec.file")
@@ -49,9 +52,13 @@ oct19in2<-oct19in%>%
   separate(selec.file,into=c("st","y","m","d","h","min","s","e"),
          sep=c(9,11,13,15,17,19,21),
          remove=TRUE)%>%
-  filter(class=="fish")%>%
-  group_by(y,m,d,h)%>%
-  summarize(ncall=n(),tcall=sum(delta.time),dt=ymd_h(paste(y,m,d,h)),site="In")%>%
+  filter(class=="fish") %>%
+  group_by(y,m,d,h) %>%
+  summarize(
+    ncall=n(),
+    tcall=sum(delta.time),
+    dt= min(ymd_h(paste(y,m,d,h))),
+    site="In")%>%
   arrange(y,m,d,h)
 
 oct19out2<-oct19out%>%
@@ -60,7 +67,10 @@ oct19out2<-oct19out%>%
            remove=TRUE)%>%
   filter(class=="fish")%>%
   group_by(y,m,d,h)%>%
-  summarize(ncall=n(),tcall=sum(delta.time),dt=ymd_h(paste(y,m,d,h)),site="Out")%>%
+  summarize(ncall=n(), 
+    tcall=sum(delta.time), 
+    dt=min(ymd_h(paste(y,m,d,h))), 
+    site="Out")%>%
   arrange(y,m,d,h)
 
 autod2<-autod%>%
@@ -69,7 +79,10 @@ autod2<-autod%>%
            remove=TRUE)%>%
   filter(agreement=="yes"|agreement=="new")%>%
   group_by(y,m,d,h)%>%
-  summarize(ncall=n(),tcall=sum(end.time-begin.time),dt=ymd_h(paste(y,m,d,h)),site="In2")%>%
+  summarize(ncall=n(),
+    tcall=sum(end.time-begin.time),
+    dt=min(ymd_h(paste(y,m,d,h))),
+    site="In-auto")%>%
   arrange(y,m,d,h)
 
 all.oct<-bind_rows(oct19in2,oct19out2,autod2)
@@ -80,6 +93,7 @@ ggplot(data=all.oct)+
   geom_line(aes(y=tcall,x=dt,color=site))
 
 ggsave("figures/oct2019_patterns.jpg")
+
 ggplot(data=in19q2)+
   geom_line(aes(y=abund,x=h,color=d,group=d))
 ggsave("figures/april2019_patterns.jpg")
