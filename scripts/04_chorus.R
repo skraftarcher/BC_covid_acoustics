@@ -6,7 +6,7 @@
 
 #load packages----
 library(tidyverse)
-library(warbleR)
+# library(warbleR)
 library(Rraven)
 library(here)
 library(lubridate)
@@ -105,3 +105,8 @@ spl<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
 ggplot(data=spl)+
   geom_line(aes(y=spl50,x=hr,color=as.factor(date),group=date))
 ggsave("figures/april2019_spl.jpg")
+
+ggplot(data=in19q2)+
+  geom_line(aes(y=abund,x=h,color=d,group=d)) +
+  geom_line(data=spl, aes(y=spl50,x=hr,color=as.factor(date),group=date), inherit.aes = F)
+
