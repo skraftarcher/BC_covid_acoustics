@@ -472,20 +472,66 @@ hourly2$log_wind_speed <- log(hourly2$wspeed+1)
 hourly2$wind_speed <- (hourly2$wspeed)
 
 hourlySPLdata <- hourly2
-
+hourlySPLdata$log_spl50 <- log(hourlySPLdata$spl50+1)
+hourlySPLdata$spl50_raw <- hourlySPLdata$spl50 + 87.7654
 
 mAR1 <- glmmTMB::glmmTMB(spl50 ~ year * phase + 
-    poly(timeofday, 2) + 
+    # poly(timeofday, 2) + 
     # poly(timeofday, 2) * site + 
     poly(wind_speed, 2) * site +
     # log_wind_speed * site +
     (1|deployment) + 
     ar1(time-1|deployment),
-  data = hourlySPLdata, family=gaussian)
+  # REML = T,
+  data = hourlySPLdata, 
+  family=gaussian)
+  # family=gaussian(link = "log"))
 
 summary(mAR1)
+car::Anova(mAR1, 
+  type = "III"
+  # component = "zi"
+  )
+
+print(mAR1)  
 ```
 
+
+
+```{r}
+# min + est for 2019
+est2019 <- 87.7654 + 14.9240
+# [1] 102.6894
+
+# min + est for 2019 + change to 2020
+est2020 <- 87.7654 + 14.9240 -8.0439
+# [1] 94.6455
+# % change in dB
+((est2020-87.7654)/(est2019-87.7654))-1
+
+
+# conversion to pressure is 10^(SPL/10)
+(10^(est2020/10))/(10^(est2019/10))
+# [1] 0.1569
+(10^(est2020/10))/(10^(est2019/10))-1
+# [1] 0.8431
+
+# simpler version
+(10^((14.9240-8.0439)/10))/(10^(14.9240/10))-1
+
+
+hist(hourlySPLdata$spl50)
+hist(hourlySPLdata$log_spl50)
+# try making response in log space but it doesn't change much
+87.7654 + exp(2.67806)
+87.7654 + exp(2.67806-0.60768)
+
+# conversion to pressure is 10^(SPL/10)
+# (10^(95.69324/10))/(10^(102.3222/10))
+1-(10^(95.69324/10))/(10^(102.3222/10))
+```
+
+These behaviour changes have resulted in a reduction in difference between mean hourly sound pressure levels and the minimum level ever recorded at either of these locations from close to 14 dB to less than 7 dB during phase I of lockdown. This effect is much smaller in phase II, even before the ferry resumes, likely do to good weather and a resumption, or even an increase over 2019, in recreational activity.
 
 ```{r}
 mAR1$frame$resid <- residuals(mAR1, type = "pearson")
@@ -542,10 +588,9 @@ acf(d$resid, lag = 40)
 ### adding different lags not changing anything
 
 ```{r }
-mnlme <- lme(spl50 ~ phase * year + poly(wspeed,2)*rca + poly(hr.c, 2)*rca,
-    random = list(~1|position), 
-             data = filter(hourly2
-               ))
+mnlme <- lme(spl50 ~ phase * year + poly(wind_speed,2)*rca, # + #poly(hr.c, 2)*rca,
+    random = list(~1|deployment), 
+             data = hourlySPLdata)
 summary(mnlme)
 ACF(mnlme,
     form = ~ hrseq.f|position)  
@@ -556,13 +601,18 @@ ACF(mnlme,
 
 
 ```{r eval = F}
-mGLS <- lme(spl50 ~ period * year.f + poly(hr.c, 2) + poly(wspeed,2)
-  , random = list(~1|position), 
-  # correlation = corAR1(form = ~ datehr|position,  value = 0.49), 
-  correlation = corARMA(form = ~ datehr|position, p=1, q = 1),
+mGLS1 <- lme(spl50 ~ phase * year + 
+    poly(timeofday, 2) + poly(wind_speed,2)
+  , random = list(~1|deployment), 
+  correlation = corAR1(form = ~ datehr|deployment,  value = 0.49), 
+  # correlation = corARMA(form = ~ datehr|deployment, p=1, q = 1),
   # method="REML",
-  data = filter(hourly2)
+  data = hourlySPLdata
   )
+
+summary(mGLS)
+summary(mGLS1)
+
 mGLS$data$resid <- residuals(mGLS, type = "normalized")
 mGLS$data$est <- predict(mGLS)
 
@@ -572,16 +622,23 @@ saveRDS(mGLS, file = "models/spl50-gls-no-rca.rds")
 AIC 27417.22
 
 ```{r eval = F}
-mGLSrca <- lme(spl50 ~ period * year.f + 
-    poly(hr.c, 2) * rca + poly(wspeed, 2) * rca
-  , random = list(~1|position), 
-  correlation = corAR1(form = ~ datehr|position
-    ,  value = 0.49
+mGLSrca <- lme(spl50 ~ phase * year + 
+    # poly(timeofday, 2) + 
+    poly(wind_speed,2)* rca
+    # poly(hr.c, 2) * rca + poly(wspeed, 2) * rca
+  , random = list(~1|deployment), 
+  correlation = corAR1(form = ~ datehr|deployment
+    ,  value = 0.72 # value estimated with glmmTMB
+    # ,  value = 0.52 # .49 if timeofday, both from ACF function
     ),
-  # correlation = corARMA(form = ~ datehr|position, p=3, q = 1),
+  # correlation = corARMA(form = ~ datehr|deployment, p=3, q = 1),
+  method="ML",
   # method="REML",
-  data = filter(hourly2)
+  data = hourlySPLdata
   )
+
+summary(mGLSrca)
+
 mGLSrca$data$resid <- residuals(mGLSrca, type = "normalized")
 mGLSrca$data$est <- predict(mGLSrca)
 
@@ -801,7 +858,7 @@ gam2 <- gamm4::gamm4(
   spl50 ~
     # s(hr.drop, bs="ts", by = position) +
     s(hr.drop, bs = "fs", by = position) + # fs gives intercept
-    s(hr.c, bs = "cc", k = 6, by = rca) +
+    # s(hr.c, bs = "cc", k = 6, by = rca) +
     s(wspeed, bs = "fs", by = rca) +
     year * phase,  
   random = ~ (1|position) + (1|rca),
