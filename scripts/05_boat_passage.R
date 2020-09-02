@@ -1,6 +1,7 @@
 # script to extract boat passages to examine further
 library(tidyverse)
 library(lubridate)
+library(readxl)
 
 splm<-read_rds("wdata/spl_by_min.rds")%>%
   mutate(hr=hour(Time),
@@ -15,7 +16,7 @@ splm<-read_rds("wdata/spl_by_min.rds")%>%
 # quick example plot to look at data
 # change from prior min
 ggplot(data=splm%>%
-    filter(Month==5 & Day ==2 & Year==2019 & hr<2),
+    filter(Month==5 & Day ==1 & Year==2019 & hr<2),
   aes(y=dspl,x=DateTime))+
   geom_line(aes(group=grp,color=grp))#+
 #  facet_wrap(~Year,scales="free",ncol=1)
@@ -232,4 +233,61 @@ points(p, splm2hr$SPL[p], col="red")
 # }
 
 
+### taking midnight ferry approach----
 
+mv19<-read_xlsx("odata/midnight_vessel.xlsx",sheet = "2019_RCA_In")#2019 ais data
+mv20<-read_xlsx("odata/midnight_vessel.xlsx",sheet = "2020_RCA_In")#2020 ais data
+spl<-read_rds("wdata/spl_by_min.rds") %>%
+  filter(rca=="in")# minute by minute spl data
+year(spl$DateTime)<-spl$Year #year in the date is messed up, fix that
+
+mv<-bind_rows(mv19,mv20)%>%
+   arrange (DateTime)%>% # make sure dataset goes from earliest to latest
+   mutate(st=DateTime-minutes(30),et=DateTime+minutes(30))%>% # create the window to match to
+   pivot_longer(st:et,names_to="tt",values_to="tint")%>% # turn it in to a long data format so we 
+   mutate(inter=row_number()) # give each interval a number- using the find interval it assigns ID based on the row # of the first line in the
+# interval i.e., the interval between rows 1 and 2 is interval 1
+
+spl$inter<-findInterval(spl$DateTime,mv$tint)#assign intervals. 
+# I'm 99% sure all intervals we want are odd, but I'm running this bit of code just to make sure 
+mv2<-mv%>%
+  select(-tint)%>%
+  pivot_wider(names_from = tt,values_from=inter)%>%
+  select(-et)%>%
+  rename(inter=st,dt=DateTime) # we have 145 candidate intervals (less actually because not all have spl data)
+
+
+
+#bring in wind data ----
+wthr<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
+  select(wspeed,rca,datehr)%>%
+  filter(rca=="in")%>%
+  select(-rca)%>%
+  arrange(datehr)
+
+# Need to subset down to dates earlier than May 4th, 2020
+spl2<-spl%>%
+  filter(inter %in% mv2$inter)%>% # filter down only to intervals within 30 mins of the ferry passing (30 before or after)
+  left_join(mv2)%>% # join the ferry passage info
+  mutate(Hr=hour(DateTime),datehr=ymd_h(paste(Year,Month,Day,Hr)))%>% # create a date hr variable to link with wind
+  left_join(wthr)%>% # join in wind
+  group_by(inter)%>% # grouping by interval because some intervals span 2 hours
+  mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
+  filter(!is.na(wsp2) & wsp2 <20 & DateTime < "2020-05-05")
+
+
+ggplot(data=spl2)+
+  geom_line(aes(y=SPL,x=DateTime,group=inter))+
+  geom_vline(aes(xintercept=dt),color="red",size=1.5,linetype="dashed")+
+  facet_wrap(~inter,scales = "free_x")
+
+interlist<-unique(spl2$inter)
+for(i in 1:length(interlist)){
+  ggplot(spl2%>%
+           filter(inter==interlist[i]))+
+    geom_line(aes(y=SPL,x=DateTime,group=inter))+
+    theme_bw()+
+    geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
+    scale_x_datetime(date_minor_breaks="5 mins")
+  ggsave(paste0("manual_figures/fig_",spl2$Year[i],spl2$Month[i],spl2$Day[i],".jpg"))
+}
