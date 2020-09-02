@@ -475,7 +475,7 @@ hourlySPLdata <- hourly2
 hourlySPLdata$log_spl50 <- log(hourlySPLdata$spl50+1)
 hourlySPLdata$spl50_raw <- hourlySPLdata$spl50 + 87.7654
 
-mAR1 <- glmmTMB::glmmTMB(spl50 ~ year * phase + 
+mAR1 <- glmmTMB::glmmTMB(spl50_raw ~ year * phase + 
     # poly(timeofday, 2) + 
     # poly(timeofday, 2) * site + 
     poly(wind_speed, 2) * site +
@@ -516,9 +516,14 @@ est2020 <- 87.7654 + 14.9240 -8.0439
 (10^(est2020/10))/(10^(est2019/10))-1
 # [1] 0.8431
 
+10^(est2020/10)
+10^(est2019/10)
+
 # simpler version
 (10^((14.9240-8.0439)/10))/(10^(14.9240/10))-1
 
+10^((14.9240-8.0439)/10)
+10^(14.9240/10)
 
 hist(hourlySPLdata$spl50)
 hist(hourlySPLdata$log_spl50)
