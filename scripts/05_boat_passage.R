@@ -283,11 +283,12 @@ ggplot(data=spl2)+
 
 interlist<-unique(spl2$inter)
 for(i in 1:length(interlist)){
-  ggplot(spl2%>%
-           filter(inter==interlist[i]))+
+  p1<-spl2%>%
+    filter(inter==interlist[i])
+    ggplot(data=p1)+
     geom_line(aes(y=SPL,x=DateTime,group=inter))+
     theme_bw()+
     geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
     scale_x_datetime(date_minor_breaks="5 mins")
-  ggsave(paste0("manual_figures/fig_",spl2$Year[i],spl2$Month[i],spl2$Day[i],".jpg"))
+  ggsave(paste0("manual_figures/fig_",p1$Year[i],p1$Month[i],p1$Day[i],".jpg"))
 }
