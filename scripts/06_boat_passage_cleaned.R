@@ -121,14 +121,36 @@ for(i in 1:length(interlist2)){
 # note that the 03-line-st-spl script only links 2019 data to st files, I don't have the 2020 data to update this
 r19in<-read_rds("wdata/spl_file.rds")
 
+spl.inters<-spl3%>%
+  filter(prd!="none")
+
 # create a dataset of sound trap files to use
 ftu<-r19in %>%
-  filter(DateTime %in% spl3$DateTime)%>% 
+  filter(DateTime %in% spl.inters$DateTime)%>% 
   dplyr::select(stfile,DateTime,Year)%>%
   distinct()%>%
-  left_join(spl3)%>%
-  dplyr::select(stfile,inter,Year,pre.int,ferry.int,post.int)%>%
-  distinct()
+  left_join(spl.inters)%>%
+  dplyr::select(stfile,DateTime,inter,Year,pre.int,ferry.int,post.int)%>%
+  distinct()%>%
+   mutate(prd=case_when(
+     DateTime %within% pre.int~"pre",
+     DateTime %within% post.int~"post",
+     DateTime %within% ferry.int~"ferry"),
+     strt=case_when(
+       prd=="pre"~int_start(pre.int),
+       prd=="ferry"~int_start(ferry.int),
+       prd=="post"~int_start(post.int)))%>%
+  group_by(stfile,inter,prd)%>%
+  filter(DateTime==min(DateTime))%>%
+  select(stfile,inter,prd,strt)%>%
+  separate(stfile,into=c("st","y","m","d","h","min","s","e"),
+                           sep=c(11,13,15,17,19,21,23),
+                           remove=FALSE)%>%
+  mutate(y=2019,
+         strt.file=ymd_hms(paste(y,m,d,h,min,s)),
+         into.file=strt-strt.file)
+  
+         
 
 # # create a list of files to place into a workspace, need 2019 and 2020 files separately
 wf19<-ftu %>%
