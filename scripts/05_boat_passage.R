@@ -283,7 +283,7 @@ ggplot(data=spl2)+
   facet_wrap(~inter,scales = "free_x")
 
 interlist<-unique(spl2$inter)
-for(i in 1:length(interlist)){
+#for(i in 1:length(interlist)){
   p1<-spl2%>%
     filter(inter==interlist[i])
     ggplot(data=p1)+
@@ -381,4 +381,17 @@ for(i in 1:length(interlist2)){
       theme(legend.position="none")
   ggsave(paste0("manual_figures/fig_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
 }
+
+# going to look at/listen to these potential ones. First have to link to file
+r19in<-read_rds("wdata/spl_file.rds")
+
+ftu<-r19in %>%
+  filter(DateTime %in% spl3$DateTime)%>%
+  dplyr::select(stfile,DateTime)%>%
+  distinct()%>%
+  left_join(spl3)%>%
+  dplyr::select(stfile,inter,pre.int,ferry.int,post.int)%>%
+  distinct()
+
+write.csv(ftu,"wdata/periods_to_examine.csv")
 

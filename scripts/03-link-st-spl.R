@@ -37,6 +37,8 @@ year(in19$DateTime)<-2019
 in19<-cbind(in19,ID=findInterval(in19$DateTime,r19in2$dt))%>%
   left_join(r19in2)%>%
   select(-ID)
+# save this for future uses
+write_rds(in19,"wdata/spl_file.rds")
 
 (in19_sample_days <- in19 %>% group_by(Year, Month, Day) %>% 
   mutate(mean_daily = median(SPL), 
