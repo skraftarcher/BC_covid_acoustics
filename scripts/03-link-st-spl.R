@@ -135,7 +135,7 @@ in20_files_1 <- filter(in_files, Deployment == 1)
 # }
 # for (i in 1:nrow(in20_files_1)){
 # file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", in20_files_1$stfile[i]),
-#   "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_quiet_days")
+#   "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/quiet_days_1")
 # }
 #
 # for steph
