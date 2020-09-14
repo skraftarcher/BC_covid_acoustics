@@ -71,9 +71,9 @@ spl3<-spl%>%
 spl3a<-spl3 %>% 
   ungroup()%>%
   filter(ferry.prd==1)%>%
-  group_by(inter)%>%
-  summarize(ferryspl=mean(SPL))%>%
-  filter(ferryspl>110)# find intervals where the ferry passage interval has a mean spl over 110
+  group_by(inter, Year, Month, Day)%>%
+  summarize(ferryspl=max(SPL))%>%
+  filter(ferryspl>105)# find intervals where the ferry passage interval has a mean spl over 105
 
 spl3<-filter(spl3,inter %in%spl3a$inter) # subset down to those intervals
 
@@ -117,20 +117,20 @@ for(i in 1:length(interlist2)){
   ggsave(paste0("manual_figures/fig_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
 }
 
-# going to look at/listen to these potential ones. First have to link to file
-# note that the 03-line-st-spl script only links 2019 data to st files, I don't have the 2020 data to update this
-r19in<-read_rds("wdata/spl_file.rds")
+# going to look at/listen to these potential ones. 
+# First have to link to file created by 03-line-st-spl script 
+spl_data <-read_rds("wdata/spl_file.rds")
 
 spl.inters<-spl3%>%
   filter(prd!="none")
 
 # create a dataset of sound trap files to use
-ftu<-r19in %>%
+ftu <- spl_data%>%
   filter(DateTime %in% spl.inters$DateTime)%>% 
   dplyr::select(stfile,DateTime,Year)%>%
   distinct()%>%
   left_join(spl.inters)%>%
-  dplyr::select(stfile,DateTime,inter,Year,pre.int,ferry.int,post.int)%>%
+  dplyr::select(stfile,DateTime,inter,Year,Deployment,pre.int,ferry.int,post.int)%>%
   distinct()%>%
    mutate(prd=case_when(
      DateTime %within% pre.int~"pre",
@@ -140,39 +140,59 @@ ftu<-r19in %>%
        prd=="pre"~int_start(pre.int),
        prd=="ferry"~int_start(ferry.int),
        prd=="post"~int_start(post.int)))%>%
+  select(-pre.int,-ferry.int,-post.int)
+  
+ftu0 <- filter(ftu, Deployment==19.1)%>%
   group_by(stfile,inter,prd)%>%
   filter(DateTime==min(DateTime))%>%
-  select(stfile,inter,prd,strt)%>%
+  # select(stfile,inter,prd,strt)%>%
   separate(stfile,into=c("st","y","m","d","h","min","s","e"),
                            sep=c(11,13,15,17,19,21,23),
                            remove=FALSE)%>%
-  mutate(y=2019,
+  mutate(y=paste0("20",y),
          strt.file=ymd_hms(paste(y,m,d,h,min,s)),
          into.file=strt-strt.file)
-  
+
+# I don't recall where Deployment==19.1 came from, but 0 makes more sense to me as these were all fixed stations in 2019
+ftu0$Deployment <- 0
+
+ftu1 <- filter(ftu, Deployment==1)%>%
+  group_by(stfile,inter,prd)%>%
+  filter(DateTime==min(DateTime))%>%
+  # select(stfile,inter,prd,strt)%>%
+  separate(stfile,into=c("st","y","m","d","h","min","s","e"),
+    sep=c(5,7,9,11,13,15,17),
+    remove=FALSE)%>%
+  mutate(y=paste0("20",y),
+    strt.file=ymd_hms(paste(y,m,d,h,min,s)),
+    into.file=strt-strt.file)
          
+ftu <- rbind(ftu0,ftu1) %>% select(-st,-e,-y,-m,-d,-h,-min,-s)
 
-# # create a list of files to place into a workspace, need 2019 and 2020 files separately
-wf19<-ftu %>%
-  filter(Year==2019)
-#until 03 script is updated there are no 2020 files to look at
-wf20<-ftu %>%
-  filter(Year==2020)
+write.csv(ftu,"wdata/periods_to_examine2.csv")
 
-write.csv(ftu,"wdata/periods_to_examine.csv")
 
+## create a list of files to place into a workspace, need 2019 and 2020 files separately
+## since deployment 2 in 2020 was not recording continuously, we can't use it here
+wf19<-filter(ftu, Deployment==0) 
+wf20<-filter(ftu, Deployment==1)
 
 ### move selected files to new folder
 ### for Philina, run just once
-# for (i in 1:65){
-# file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", wf19$stfile[i]), 
+# for (i in 1:length(unique(wf19$stfile))){
+# file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", unique(wf19$stfile)[i]),
 #   "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/boat_passage")
 # }
-
-# for steph
-for (i in 1:65){
-file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile[i]),
-  "E:/RCA_IN/April_July2019/boat_passage")
-}
+# 
+# for (i in 1:length(unique(wf20$stfile))){
+#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", unique(wf20$stfile)[i]),
+#     "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/boat_passage_1")
+# }
+# 
+# # for steph
+# for (i in 1:65){
+# file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile[i]),
+#   "E:/RCA_IN/April_July2019/boat_passage")
+# }
 
 
