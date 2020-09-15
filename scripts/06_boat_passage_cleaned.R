@@ -47,19 +47,23 @@ spl3<-spl%>%
   filter(!is.na(wsp2) & wsp2 <20 & DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
   mutate(tperiods=ifelse(DateTime<dt,"pre","post"))%>% # create periods before the closest passage of the ferry and after
   group_by(inter,tperiods)%>% 
-  mutate(pre.pst=case_when(
-    tperiods=="pre"& zoo::rollmax(SPL,k=5,fill=NA,align="left")<100~1,# find 5 minute periods in the pre period where the maximum spl is < 100 
+  mutate(
+    ferry.int=interval(dt-minutes(6),dt-minutes(1)),# create a ferry interval that is the 5 minutes before the closest passage
+    ferry.prd=if_else(DateTime %within% ferry.int,1,0), #create a new interval that indicates whether or not the minute is within the ferry interval
+    pre.pst=case_when(
+    tperiods=="pre" & ferry.prd!=1 & # find 5 minute periods in the period >5 min before closest passage 
+        zoo::rollmax(SPL,k=5,fill=NA,align="left")<100~1, # where the maximum spl is < 100 
     tperiods=="pre"& zoo::rollmax(SPL,k=5,fill=NA,align="left")>100~0, 
     tperiods=="pre"& is.na(zoo::rollmax(SPL,k=5,fill=NA,align="left"))~0,
+    tperiods=="pre"& ferry.prd==1~0,  
     tperiods=="post"~0),
     post.pst=case_when(
       tperiods=="post"& zoo::rollmax(SPL,k=5,fill=NA,align="right")<100~1,# find 5 minute periods in the post period where the maximum spl is < 100 
       tperiods=="post"& zoo::rollmax(SPL,k=5,fill=NA,align="right")>100~0,
       tperiods=="post"& is.na(zoo::rollmax(SPL,k=5,fill=NA,align="right"))~0,
       tperiods=="pre"~0),
-    pt.int=ifelse(pre.pst==1|post.pst==1,1,0),# create a new variable that indicates whether or not the minute is part of a potential interval
-    ferry.int=interval(dt-minutes(6),dt-minutes(1)),# create a ferry interval that is the 5 minutes before the closest passage
-    ferry.prd=if_else(DateTime %within% ferry.int,1,0))%>% #create a new interval that indicates whether or not the minute is within the ferry interval
+    pt.int=ifelse(pre.pst==1|post.pst==1,1,0)# create a new variable that indicates whether or not the minute is part of a potential interval
+  )%>% 
   group_by(inter,tperiods,pt.int)%>% 
   mutate(pre.pst=ifelse(pre.pst==1& dt-DateTime==min(dt-DateTime),1,0),# find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
          post.pst=ifelse(post.pst==1& DateTime-dt==min(DateTime-dt),1,0))%>% # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
@@ -109,12 +113,12 @@ for(i in 1:length(interlist2)){
   ggplot(data=p1)+
     geom_line(aes(y=SPL,x=DateTime,group=inter))+
     geom_line(aes(y=88,x=DateTime,group=inter,color=prd),size=1.5)+
-    scale_color_manual(values=c("red","white","red","red"),name="Potential interval")+
+    scale_color_manual(values=c("red","white","orange","orange"),name="Potential interval")+
     theme_bw()+
     geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
     scale_x_datetime(date_minor_breaks="5 mins")+
     theme(legend.position="none")
-  ggsave(paste0("manual_figures/fig_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
+  ggsave(paste0("manual_figures/fig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
 }
 
 # going to look at/listen to these potential ones. 
@@ -167,9 +171,9 @@ ftu1 <- filter(ftu, Deployment==1)%>%
     strt.file=ymd_hms(paste(y,m,d,h,min,s)),
     into.file=strt-strt.file)
          
-ftu <- rbind(ftu0,ftu1) %>% select(-st,-e,-y,-m,-d,-h,-min,-s)
+ftu <- rbind(ftu0,ftu1) %>% select(-st,-e,-y,-m,-d,-h,-min,-s, -DateTime, -Year)
 
-write.csv(ftu,"wdata/periods_to_examine2.csv")
+write.csv(ftu, "wdata/periods_to_examine2.csv")
 
 
 ## create a list of files to place into a workspace, need 2019 and 2020 files separately
