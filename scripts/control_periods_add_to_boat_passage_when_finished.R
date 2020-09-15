@@ -1,15 +1,21 @@
 # find control periods ----
 # Need to subset down to dates earlier than May 4th, 2020
+# choose time of quiet required
+
+quietmin <- 60
+quietmin <- 40
+quietmin <- 20 # only two missing
+
 splc<-spl%>%
   mutate(Hr=hour(DateTime),datehr=ymd_h(paste(Year,Month,Day,Hr)))%>% # create a date hr variable to link with wind
   left_join(wthr)%>% # join in wind
   filter(!is.na(wspeed) & wspeed <20 & DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% # subset down to intervals where there's not much wind before 5/5/20
   mutate(pst=case_when(
-    zoo::rollmax(SPL,k=60,fill=NA,align="left")<105~1,
-    zoo::rollmax(SPL,k=60,fill=NA,align="left")>105~0),# find 60 minute periods where the maximum spl is < 100 
+    zoo::rollmax(SPL,k=quietmin,fill=NA,align="left")<105~1,
+    zoo::rollmax(SPL,k=quietmin,fill=NA,align="left")>105~0),# find 60 minute periods where the maximum spl is < 100 
     pst2=case_when(
-      zoo::rollmax(SPL,k=60,fill=NA,align="right")<105~1,
-      zoo::rollmax(SPL,k=60,fill=NA,align="right")>105~0),# find 60 minute periods maximum spl is < 100 
+      zoo::rollmax(SPL,k=quietmin,fill=NA,align="right")<105~1,
+      zoo::rollmax(SPL,k=quietmin,fill=NA,align="right")>105~0),# find 60 minute periods maximum spl is < 100 
     qp=case_when(
       pst==1 | pst2==1~1,
       is.na(pst) & pst2==1~1,
@@ -18,8 +24,8 @@ splc<-spl%>%
       is.na(pst) & pst2==0~0,
       pst==0 & is.na(pst2)~0),
     dymd=ymd(paste(Year,Month,Day)),
-    lint=interval(DateTime,DateTime+minutes(60)),
-    rint=interval(DateTime-minutes(60),DateTime))%>% # assign a 1 if either way of looking for a quiet 60 minute interval 
+    lint=interval(DateTime,DateTime+minutes(quietmin)),
+    rint=interval(DateTime-minutes(quietmin),DateTime))%>% # assign a 1 if either way of looking for a quiet 60 minute interval 
   filter(qp==1)%>%
   select(dymd,pst,pst2,lint,rint)
 
