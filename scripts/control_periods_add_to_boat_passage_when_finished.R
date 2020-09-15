@@ -104,7 +104,7 @@ fcp<-ftu%>% # get the files to use
   pivot_wider(names_from=prd,values_from=strt)%>% # make a wider data frame
   mutate(dymd=ymd(paste(year(post),month(post),day(post))),
          pre2=pre+minutes(5),#get the end of the pre-period
-         ferry2t=ferry+minutes(5),#get the end of the ferry period
+         ferry2=ferry+minutes(5),#get the end of the ferry period
          pf=difftime(ferry,pre2,units="mins"),#calculate the length of time between the end of the pre-period and the start of the ferry period
          fp=difftime(post,ferry2,units="mins"),#calculate the length of time between the end of the ferry-period and the start of the post-period
          pl=15+pf+fp)%>% #calculate how long the boat period is
@@ -170,15 +170,51 @@ wf19<-ftu.b%>%
   select(stfile.boat)%>%
   distinct()
 
-for (i in 1:nrow(wf19)){
-  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
-            "E:/RCA_IN/April_July2019/boat_passage")
-}
+wf20<-ftu.b%>%
+  filter(Deployment==1)%>%
+  select(stfile.boat)%>%
+  distinct()
+
 
 qf19<-ftu.q%>%
   filter(Deployment==0)%>%
   select(stfile.strt)%>%
   distinct()
+
+qf20<-ftu.q%>%
+  filter(Deployment==1)%>%
+  select(stfile.strt)%>%
+  distinct()
+
+### move selected files to new folder
+### for Philina, run just once
+for (i in 1:length(wf19$stfile.boat)){
+file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", wf19$stfile.boat[i]),
+  "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/boat_passage")
+}
+
+for (i in 1:length(wf20$stfile.boat)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", wf20$stfile.boat[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/boat_passage_1")
+}
+
+
+for (i in 1:nrow(qf19)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", qf19$stfile.strt[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/quiet_period")
+}
+
+for (i in 1:nrow(qf20)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", qf20$stfile.strt[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/quiet_period_1")
+}
+
+
+### for Steph, run just once
+for (i in 1:nrow(wf19)){
+  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
+            "E:/RCA_IN/April_July2019/boat_passage")
+}
 
 for (i in 1:nrow(qf19)){
   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
