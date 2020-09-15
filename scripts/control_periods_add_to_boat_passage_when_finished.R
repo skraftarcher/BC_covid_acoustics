@@ -165,7 +165,24 @@ write.csv(ftu.q,"wdata/files_to_evaluate_quiet.csv")
 #          sep=c(-16,-14,-12,-10,-8,-6,-4),
 #          remove=FALSE)
 
-  
+wf19<-ftu.b%>%
+  filter(Deployment==0)%>%
+  select(stfile.boat)%>%
+  distinct()
 
+for (i in 1:nrow(wf19)){
+  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
+            "E:/RCA_IN/April_July2019/boat_passage")
+}
+
+qf19<-ftu.q%>%
+  filter(Deployment==0)%>%
+  select(stfile.strt)%>%
+  distinct()
+
+for (i in 1:nrow(qf19)){
+  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
+            "E:/RCA_IN/April_July2019/quiet_period")
+}
 
 
