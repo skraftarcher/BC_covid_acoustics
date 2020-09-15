@@ -45,7 +45,11 @@ spl3<-spl%>%
   group_by(inter)%>% # grouping by interval because some intervals span 2 hours
   mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
   filter(!is.na(wsp2) & wsp2 <20 & DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
-  mutate(tperiods=ifelse(DateTime<dt,"pre","post"))%>% # create periods before the closest passage of the ferry and after
+  mutate(dt2=dt-minutes(7),
+         tperiods=case_when(
+           DateTime<dt2~"pre",
+           DateTime>dt~"post",
+           DateTime>dt2&DateTime<dt~"oth"))%>% # create periods before the closest passage of the ferry and after
   group_by(inter,tperiods)%>% 
   mutate(
     ferry.int=interval(dt-minutes(6),dt-minutes(1)),# create a ferry interval that is the 5 minutes before the closest passage
@@ -56,16 +60,18 @@ spl3<-spl%>%
     tperiods=="pre"& zoo::rollmax(SPL,k=5,fill=NA,align="left")>100~0, 
     tperiods=="pre"& is.na(zoo::rollmax(SPL,k=5,fill=NA,align="left"))~0,
     tperiods=="pre"& ferry.prd==1~0,  
-    tperiods=="post"~0),
+    tperiods=="post"~0,
+    tperiods=="oth"~0),
     post.pst=case_when(
       tperiods=="post"& zoo::rollmax(SPL,k=5,fill=NA,align="right")<100~1,# find 5 minute periods in the post period where the maximum spl is < 100 
       tperiods=="post"& zoo::rollmax(SPL,k=5,fill=NA,align="right")>100~0,
       tperiods=="post"& is.na(zoo::rollmax(SPL,k=5,fill=NA,align="right"))~0,
-      tperiods=="pre"~0),
+      tperiods=="pre"~0,
+      tperiods=="oth"~0),
     pt.int=ifelse(pre.pst==1|post.pst==1,1,0)# create a new variable that indicates whether or not the minute is part of a potential interval
   )%>% 
   group_by(inter,tperiods,pt.int)%>% 
-  mutate(pre.pst=ifelse(pre.pst==1& dt-DateTime==min(dt-DateTime),1,0),# find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
+  mutate(pre.pst=ifelse(pre.pst==1& int_start(ferry.int)-DateTime==min(int_start(ferry.int)-DateTime),1,0),# find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
          post.pst=ifelse(post.pst==1& DateTime-dt==min(DateTime-dt),1,0))%>% # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
   ungroup(tperiods,pt.int)%>%
   mutate(keep.inter=ifelse(sum(pre.pst)!=0 & sum(post.pst)!=0,1,0))%>% # only keep intervals where there is a qualifying period in both pre and post ferry periods
@@ -158,6 +164,7 @@ ftu0 <- filter(ftu, Deployment==19.1)%>%
          into.file=strt-strt.file)
 
 # I don't recall where Deployment==19.1 came from, but 0 makes more sense to me as these were all fixed stations in 2019
+# its because you had RCA In and RCA out as 19.1 and 19.2 
 ftu0$Deployment <- 0
 
 ftu1 <- filter(ftu, Deployment==1)%>%
@@ -173,13 +180,22 @@ ftu1 <- filter(ftu, Deployment==1)%>%
          
 ftu <- rbind(ftu0,ftu1) %>% select(-st,-e,-y,-m,-d,-h,-min,-s, -DateTime, -Year)
 
-write.csv(ftu, "wdata/periods_to_examine2.csv")
+write.csv(ftu, "wdata/periods_to_examine3.csv")
 
 
 ## create a list of files to place into a workspace, need 2019 and 2020 files separately
 ## since deployment 2 in 2020 was not recording continuously, we can't use it here
-wf19<-filter(ftu, Deployment==0) 
-wf20<-filter(ftu, Deployment==1)
+
+# have to get these down to a unique list of files
+
+wf19<-filter(ftu, Deployment==0) %>%
+  ungroup()%>%
+  select(stfile)%>%
+  distinct()
+wf20<-filter(ftu, Deployment==1)%>%
+  ungroup()%>%
+  select(stfile)%>%
+  distinct()
 
 ### move selected files to new folder
 ### for Philina, run just once
@@ -194,9 +210,9 @@ wf20<-filter(ftu, Deployment==1)
 # }
 # 
 # # for steph
-# for (i in 1:65){
-# file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile[i]),
-#   "E:/RCA_IN/April_July2019/boat_passage")
-# }
+for (i in 1:nrow(wf19)){
+file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile[i]),
+  "E:/RCA_IN/April_July2019/boat_passage")
+}
 
 
