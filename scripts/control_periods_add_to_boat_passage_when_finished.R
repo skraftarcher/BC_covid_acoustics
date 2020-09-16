@@ -107,8 +107,9 @@ fcp<-ftu%>% # get the files to use
          ferry2=ferry+minutes(5),#get the end of the ferry period
          pf=difftime(ferry,pre2,units="mins"),#calculate the length of time between the end of the pre-period and the start of the ferry period
          fp=difftime(post,ferry2,units="mins"),#calculate the length of time between the end of the ferry-period and the start of the post-period
-         pl=15+pf+fp)%>% #calculate how long the boat period is
-  select(inter,post,pl)# only keep inter, post(start of the post period), and period length
+         midtimediff=fp+10,
+         passlen=15+pf+fp)%>% #calculate how long the boat period is
+  select(inter,post,passlen, midtimediff)# only keep inter, post(start of the post period), and period length
 
   
   
@@ -130,9 +131,15 @@ splq3<-splq2%>% #create a new splq dataset
   filter(!is.na(post))%>%# get rid of lines where there isn't a start to the post period
   mutate(epost=post+minutes(5),# calculate the end of the post period.
          tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
-         keep=ifelse(qpl>=pl,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
+         minquiet=qplength-passlen,
+         midquiet=qplength-midtimediff,
+         maxquiet=qplength-5,
+         keep=ifelse(qpl>=passlen,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   filter(keep==1)%>%
-  select(inter,tgap,eqtime=DateTime,qplength)
+  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet)
+
+all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
+hist(all.qp.lengths, breaks = 30)
 
 ftu2<-left_join(ftu,splq3)%>%
   ungroup()%>%
