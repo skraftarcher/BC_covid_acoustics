@@ -74,13 +74,18 @@ spl$inter<-findInterval(spl$DateTime,mv$tint)
 #   left_join(splc)
 # 
 # 
+wthr<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
+  select(wspeed,rca,Year=year,Month=month,Day=day,Hr=hr)%>%
+  filter(rca=="in")%>%
+  select(-rca)
+  
 
 ### trying to quantify longest period of quiet
 
 splq<-spl%>%
-  mutate(Hr=hour(DateTime),datehr=ymd_h(paste(Year,Month,Day,Hr)))%>% # create a date hr variable to link with wind
+  mutate(Hr=hour(DateTime))%>% # create a date hr variable to link with wind
   left_join(wthr)%>% # join in wind
-  filter(!is.na(wspeed) & wspeed <20 & DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% 
+  filter(wspeed <20 & !is.na(wspeed) & DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% 
   mutate(isq=ifelse(SPL<100,1,0),dymd=ymd(paste(Year,Month,Day)))#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
 
 dtl<-unique(splq$dymd)#the days to evaluate
@@ -149,7 +154,8 @@ ftu2<-left_join(ftu,splq3)%>%
          pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
   pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
   rename(stfile.boat=stfile)%>%#rename the current stfile to indicate that file is for the boat passage
-  select(-Deployment) # remove deployment again
+  select(-Deployment)%>%
+  filter(keep==1)# remove deployment again
 
 second(ftu2$quiet2)<-0 # set the seconds in quiet2 to 0
 
