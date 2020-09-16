@@ -110,20 +110,20 @@ spl3<-spl3%>%
            ferry.prd==1~"ferry",
            pre.prd==0 & post.prd==0 & ferry.prd ==0~"none"))# create a variable that indicates which period the minute belongs to
 # make figures to examine the spl profile of the candidate periods
-interlist2<-unique(spl3$inter)
-for(i in 1:length(interlist2)){
-  p1<-spl3%>%
-    filter(inter==interlist2[i])
-  ggplot(data=p1)+
-    geom_line(aes(y=SPL,x=DateTime,group=inter))+
-    geom_line(aes(y=88,x=DateTime,group=inter,color=prd),size=1.5)+
-    scale_color_manual(values=c("red","white","orange","orange"),name="Potential interval")+
-    theme_bw()+
-    geom_vline(aes(xintercept=boatdt),color="red",linetype="dashed")+
-    scale_x_datetime(date_minor_breaks="5 mins")+
-    theme(legend.position="none")
-  ggsave(paste0("manual_figures/fig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
-}
+# interlist2<-unique(spl3$inter)
+# for(i in 1:length(interlist2)){
+#   p1<-spl3%>%
+#     filter(inter==interlist2[i])
+#   ggplot(data=p1)+
+#     geom_line(aes(y=SPL,x=DateTime,group=inter))+
+#     geom_line(aes(y=88,x=DateTime,group=inter,color=prd),size=1.5)+
+#     scale_color_manual(values=c("red","white","orange","orange"),name="Potential interval")+
+#     theme_bw()+
+#     geom_vline(aes(xintercept=boatdt),color="red",linetype="dashed")+
+#     scale_x_datetime(date_minor_breaks="5 mins")+
+#     theme(legend.position="none")
+#   ggsave(paste0("manual_figures/fig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
+# }
 
 
 spl.inters<-spl3%>%
@@ -199,18 +199,36 @@ splq3<-splq2%>% #create a new splq dataset
          maxquiet=qplength-5,
          keep=ifelse(qpl>=passlen,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   # filter(keep==1)%>%
-  select(inter,tgap,eqtime=DateTime,stfile,filedt,qplength,passlen,minquiet, midquiet,maxquiet,keep)
+  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
 
 ftu2<-ftu%>%
   select(inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
   distinct()%>%
   left_join(splq3)%>%
-  filter(!is.na(Year))%>%
+  filter(!is.na(dymd))%>%
   ungroup()%>%
   mutate(quiet=strt+tgap,# calculate the start of of each control period (one for each pre,ferry,and post period)
          qstrt=quiet,# this is the start of the 5 minute period to analyze
          pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
   pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
   filter(keep==1)# remove deployment again
+second(ftu2$quiet2)<-0
+splq4<-spl%>%
+  mutate(quiet2=DateTime)%>%
+  select(-inter)
+second(splq4$quiet2)<-0
+
+ftu.b<-ftu2%>%
+  select(inter,prd,boat.stfile,boat.intofile)%>%
+  distinct()
+
+ftu.q<-ftu2%>%
+  select(inter,prd,quiet,quiet2)%>%
+  left_join(splq4)%>%
+  select(inter,prd,quiet,stfile,filedt)%>%
+  mutate(into.file=quiet-filedt)
+
+write.csv(ftu.b,"wdata/files_to_evaluate_boat_061920.csv")
+write.csv(ftu.q,"wdata/files_to_evaluate_quiet_061920.csv")
 
 
