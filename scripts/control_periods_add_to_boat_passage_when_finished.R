@@ -120,30 +120,31 @@ second(spl_data2$quiet2)<-0# remove the seconds from quiet2
 
 
 splq3<-splq2%>% #create a new splq dataset
-  group_by(dymd)%>% #group by day
-  mutate(eqp=ifelse(qpl==max(qpl),1,0), #assign a 1 to the end (last minute) of longest quiet period (eqp)
+  group_by(dymd)%>% # group by day
+  mutate(qplength=max(qpl),
+         eqp=ifelse(qpl==max(qpl),1,0), # assign a 1 to the end (last minute) of longest quiet period (eqp)
          inter=inter-1)%>%# substract 1 from the interval here to make the boat passage intervals
-  filter(eqp==1)%>%#only keep the end of the quiet period
-  select(-Deployment)%>%#remove deployment
-  left_join(fcp)%>%#join in the file to keep
+  filter(eqp==1)%>%# only keep the end of the quiet period
+  select(-Deployment)%>%# remove deployment
+  left_join(fcp)%>%# join in the file to keep
   filter(!is.na(post))%>%# get rid of lines where there isn't a start to the post period
-  mutate(epost=post+minutes(5),#calculate the end of the post period.
-         tgap=difftime(DateTime,epost,units="mins"),#find the time gap (tgap) between the end of the post period and the end of the quiet period
+  mutate(epost=post+minutes(5),# calculate the end of the post period.
+         tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
          keep=ifelse(qpl>=pl,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   filter(keep==1)%>%
-  select(inter,tgap,eqtime=DateTime)
+  select(inter,tgap,eqtime=DateTime,qplength)
 
 ftu2<-left_join(ftu,splq3)%>%
   ungroup()%>%
   filter(!is.na(tgap))%>%# only keep periods where there is a time gap
-  mutate(quiet=strt+tgap,#calculate the start of of each control period (one for each pre,ferry,and post period)
-         qstrt=quiet,#this is the start of the 5 minute period to analyze
-         pend=quiet+minutes(5))%>%#this is the end of the 5 minute period to analyze
-  pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%#pivot longer so that the start and end times are in a single variable
+  mutate(quiet=strt+tgap,# calculate the start of of each control period (one for each pre,ferry,and post period)
+         qstrt=quiet,# this is the start of the 5 minute period to analyze
+         pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
+  pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
   rename(stfile.boat=stfile)%>%#rename the current stfile to indicate that file is for the boat passage
-  select(-Deployment) #remove deployment again
+  select(-Deployment) # remove deployment again
 
-second(ftu2$quiet2)<-0#set the seconds in quiet2 to 0
+second(ftu2$quiet2)<-0 # set the seconds in quiet2 to 0
 
 ftu3<-left_join(ftu2,spl_data2)%>% # join stfile dataset
   mutate(into.file.quiet=quiet-strt.file.quiet)%>% #calculate how many seconds into the file the period starts
@@ -220,5 +221,25 @@ for (i in 1:nrow(qf19)){
   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
             "E:/RCA_IN/April_July2019/quiet_period")
 }
+
+
+interlist2<-unique(ftu.b$inter)
+for(i in 1:length(interlist2)){
+  p1<-splq2%>%
+    filter(inter==interlist2[i]+1)
+  p2 <- ftu.q %>% filter(inter==interlist2[i])
+  
+  ggplot(data=p1)+
+    geom_line(aes(y=SPL,x=DateTime))+
+    geom_segment(data=p2, aes(y=88, yend=88, x=quiet, xend= (quiet + minutes(5)), color=prd),size=1.5, inherit.aes = F)+
+    scale_color_manual(values=c("red","orange","orange"),name="Potential interval")+
+    theme_bw()+
+    # geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
+    scale_x_datetime(date_minor_breaks="5 mins")+
+    coord_cartesian(ylim=c(85,120)) +
+    theme(legend.position="none")
+  ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"105cutoff.jpg"))
+}
+
 
 
