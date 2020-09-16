@@ -81,7 +81,7 @@ splq<-spl%>%
   mutate(Hr=hour(DateTime),datehr=ymd_h(paste(Year,Month,Day,Hr)))%>% # create a date hr variable to link with wind
   left_join(wthr)%>% # join in wind
   filter(!is.na(wspeed) & wspeed <20 & DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% 
-  mutate(isq=ifelse(SPL<105,1,0),dymd=ymd(paste(Year,Month,Day)))#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
+  mutate(isq=ifelse(SPL<100,1,0),dymd=ymd(paste(Year,Month,Day)))#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
 
 dtl<-unique(splq$dymd)#the days to evaluate
 splq$qpl<-NA  #create the qpl (quiet period length) variable
@@ -135,8 +135,8 @@ splq3<-splq2%>% #create a new splq dataset
          midquiet=qplength-midtimediff,
          maxquiet=qplength-5,
          keep=ifelse(qpl>=passlen,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
-  filter(keep==1)%>%
-  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet)
+  # filter(keep==1)%>%
+  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
 
 all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
 hist(all.qp.lengths, breaks = 30)
@@ -245,7 +245,7 @@ for(i in 1:length(interlist2)){
     scale_x_datetime(date_minor_breaks="5 mins")+
     coord_cartesian(ylim=c(85,120)) +
     theme(legend.position="none")
-  ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"105cutoff.jpg"))
+  ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"104cutoff.jpg"))
 }
 
 
