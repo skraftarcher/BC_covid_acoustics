@@ -1,5 +1,5 @@
 # Data files
-*.xlsx
+*.xls
 *.csv
 *.rds
 *.txt
@@ -19,6 +19,7 @@
 
 # User-specific files
 .Ruserdata
+.DS_Store
 
 # Example code in package build process
 *-Ex.R
