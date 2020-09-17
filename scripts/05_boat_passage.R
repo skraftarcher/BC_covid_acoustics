@@ -216,6 +216,7 @@ ftu2<-ftu%>%
   pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
   filter(keep==1)# remove deployment again
 second(ftu2$quiet2)<-0
+
 splq4<-spl%>%
   mutate(quiet2=DateTime)%>%
   select(-inter)
@@ -229,7 +230,8 @@ ftu.q<-ftu2%>%
   select(inter,prd,quiet,quiet2)%>%
   left_join(splq4)%>%
   select(inter,prd,quiet,stfile,filedt)%>%
-  mutate(into.file=quiet-filedt)
+  mutate(into.file=quiet-filedt)%>%
+  distinct()
 
 write.csv(ftu.b,"wdata/files_to_evaluate_boat_061920.csv")
 write.csv(ftu.q,"wdata/files_to_evaluate_quiet_061920.csv")
