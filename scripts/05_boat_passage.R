@@ -199,12 +199,14 @@ splq3<-splq2%>% #create a new splq dataset
   filter(!is.na(post))%>%# get rid of lines where there isn't a start to the post period
   mutate(epost=post+minutes(5),# calculate the end of the post period.
          tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
+         mintgap=ifelse(tgap==min(tgap),1,0),
          minquiet=qplength-passlen,
          midquiet=qplength-midtimediff,
          maxquiet=qplength-5,
-         keep=ifelse(qpl>=passlen,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
+         keep=ifelse(qpl>=passlen&mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   # filter(keep==1)%>%
   select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
+
 
 ftu2<-ftu%>%
   select(inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
