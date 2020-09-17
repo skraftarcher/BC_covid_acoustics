@@ -35,7 +35,7 @@ wthr<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
 
 # Need to subset down to dates earlier than May 4th, 2020
 spl3<-spl%>%
-  filter(inter %in% mv2$inter)%>% # filter down only to intervals within 30 mins of the ferry passing (30 before or after)
+  filter(inter %in% mv2$inter)%>% # filter down only to intervals within 60 mins of the ferry passing (60 before or after)
   left_join(mv)%>% # join the ferry passage info
   mutate(Hr=hour(DateTime))%>% # create a date hr variable to link with wind
   left_join(wthr)%>% # join in wind
@@ -151,8 +151,13 @@ ftu <- spl.inters%>%
 splq<-spl%>%
   mutate(Hr=hour(DateTime),dymd=paste0(Year,Month,Day))%>% # create a date hr variable to link with wind
   left_join(wthr)%>% # join in wind
-  filter(wspeed <20 & !is.na(wspeed) & DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% 
+  filter(
+    # wspeed <20 & !is.na(wspeed) & 
+      DateTime < "2020-05-05" & Hr < 5 & Hr >=2) %>% 
   mutate(isq=ifelse(SPL<100,1,0),inter=inter-1)#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
+
+# remove faulty inter assignment of 113 for both "201961" and "201962"
+splq[splq$dymd=="201962",]$inter <- NA
 
 dtl<-unique(splq$dymd)#the days to evaluate
 splq$qpl<-NA  #create the qpl (quiet period length) variable
@@ -231,4 +236,29 @@ ftu.q<-ftu2%>%
 write.csv(ftu.b,"wdata/files_to_evaluate_boat_061920.csv")
 write.csv(ftu.q,"wdata/files_to_evaluate_quiet_061920.csv")
 
+
+# FIGURES
+
+all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
+hist(all.qp.lengths, breaks = 30)
+
+interlist2<-unique(ftu.q$inter)
+
+
+for(i in 1:length(interlist2)){
+  p1<-splq%>%
+    filter(inter==interlist2[i])
+  p2 <- ftu.q %>% filter(inter==interlist2[i])
+  
+  ggplot(data=p1)+
+    geom_line(aes(y=SPL,x=DateTime))+
+    geom_segment(data=p2, aes(y=88, yend=88, x=quiet, xend= (quiet + minutes(5)), color=prd),size=1.5, inherit.aes = F)+
+    scale_color_manual(values=c("red","orange","orange"),name="Potential interval")+
+    theme_bw()+
+    # geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
+    scale_x_datetime(date_minor_breaks="5 mins")+
+    coord_cartesian(ylim=c(85,120)) +
+    theme(legend.position="none")
+  ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_100.jpg"))
+}
 
