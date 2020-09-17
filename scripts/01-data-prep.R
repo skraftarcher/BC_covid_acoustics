@@ -25,6 +25,7 @@ in192 <- in19 %>%
     Deployment=19.1
   ) %>%
   filter(!(Month == 4 & Day == 10)) # day deployed
+year(in192$DateTime)<-2019
 
 out192 <- out19 %>%
   mutate(
@@ -34,6 +35,7 @@ out192 <- out19 %>%
     Deployment=19.1
   ) %>%
   filter(!(Month == 4 & Day == 10)) # day deployed
+year(out192$DateTime)<-2019
 
 in202 <- in20 %>%
   mutate(
@@ -46,6 +48,7 @@ in202 <- in20 %>%
       !(Month == 5 & Day == 24) & # day deployed for period 2
       !(Month == 6 & Day >= 21) # day retrived for period 2
   )
+year(in202$DateTime)<-2020
 
 out202 <- out20 %>%
   mutate(
@@ -58,11 +61,13 @@ out202 <- out20 %>%
       !(Month == 5 & Day == 24) & # day deployed for period 2
       !(Month == 6 & Day >= 19) # day retrived for period 2
   )
+year(out202$DateTime)<-2020
 
 
 # save minute by minute dataset for picking out ship passages
 
 spl_min<-rbind(in192,in202,out192,out202)
+
 
 write_rds(spl_min,"wdata/spl_by_min.rds")
 write.csv(spl_min,"wdata/spl_by_min.cvs")
