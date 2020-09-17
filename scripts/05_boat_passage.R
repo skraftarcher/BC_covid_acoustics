@@ -189,7 +189,7 @@ fcp<-ftu%>% # get the files to use
          passlen=15+pf+fp)%>% #calculate how long the boat period is
   select(inter,post,passlen, midtimediff)# only keep inter, post(start of the post period), and period length
 
-splq3<-splq2%>% #create a new splq dataset
+splq3all<-splq2%>% #create a new splq dataset
   group_by(dymd)%>% # group by day
   mutate(qplength=max(qpl),
          eqp=ifelse(qpl==max(qpl),1,0))%>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
@@ -204,14 +204,12 @@ splq3<-splq2%>% #create a new splq dataset
          midquiet=qplength-midtimediff,
          maxquiet=qplength-5,
          keep=ifelse(qpl>=passlen&mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
-  # filter(keep==1)%>%
   select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
-
 
 ftu2<-ftu%>%
   select(inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
   distinct()%>%
-  left_join(splq3)%>%
+  left_join(splq3all)%>%
   filter(!is.na(dymd))%>%
   ungroup()%>%
   mutate(quiet=strt+tgap,# calculate the start of of each control period (one for each pre,ferry,and post period)
@@ -240,6 +238,8 @@ write.csv(ftu.q,"wdata/files_to_evaluate_quiet_061920.csv")
 
 
 # FIGURES
+
+splq3<-splq3all%>% filter(keep==1)
 
 all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
 hist(all.qp.lengths, breaks = 30)
