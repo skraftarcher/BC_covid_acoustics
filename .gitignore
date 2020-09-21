@@ -2,7 +2,7 @@
 *.xls
 *.csv
 *.rds
-*.txt
+# *.txt
 # figures
 *.png
 *.jpg
@@ -33,6 +33,7 @@ scripts/*.html
 # knitr and R markdown default cache directories
 *_cache/
 /cache/
+/selection.tables/
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
