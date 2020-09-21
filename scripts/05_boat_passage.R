@@ -7,6 +7,10 @@ if(!require(filesstrings))install.packages("filesstrings");library(filesstrings)
 # Bring in data ----
 mv19<-read_xlsx("odata/midnight_vessel.xlsx",sheet = "2019_RCA_In")#2019 ais data
 mv20<-read_xlsx("odata/midnight_vessel.xlsx",sheet = "2020_RCA_In")#2020 ais data
+mv19am<-read_xlsx("odata/morning_vessel.xlsx",sheet = "2019_RCAIn")#2020 ais data
+mv20am<-read_xlsx("odata/morning_vessel.xlsx",sheet = "2020_RCAIN")#2020 ais data
+
+
 spl<-read_rds("wdata/spl_file.rds") %>%
   filter(site=="RCA_In")%>%
   rename(filedt=dt)# minute by minute spl data
@@ -204,8 +208,10 @@ splq3all<-splq2%>% #create a new splq dataset
          keep=ifelse(qpl>=passlen&mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
 
+splq3 <- splq3all %>% filter(keep==1)# remove deployment again
+
 ftu2<-ftu%>%
-  select(inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
+  select(Year,Deployment,inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
   distinct()%>%
   left_join(splq3all)%>%
   filter(!is.na(dymd))%>%
@@ -223,19 +229,75 @@ splq4<-spl%>%
 second(splq4$quiet2)<-0
 
 ftu.b<-ftu2%>%
-  select(inter,prd,boat.stfile,boat.intofile)%>%
+  select(Year,Deployment,inter,prd,boat.stfile,boat.intofile)%>%
   distinct()
 
 ftu.q<-ftu2%>%
-  select(inter,prd,quiet,quiet2)%>%
+  select(Year,Deployment,inter,prd,quiet,quiet2)%>%
   left_join(splq4)%>%
-  select(inter,prd,quiet,stfile,filedt)%>%
+  select(Year,Deployment,inter,prd,quiet,stfile,filedt)%>%
   mutate(into.file=quiet-filedt)%>%
   distinct()
 
 write.csv(ftu.b,"wdata/files_to_evaluate_boat_061920.csv")
 write.csv(ftu.q,"wdata/files_to_evaluate_quiet_061920.csv")
 
+### move selected files to new folder
+
+wf19<-ftu.b%>%
+  filter(Deployment==0)%>%
+  select(boat.stfile)%>%
+  distinct()
+
+wf20<-ftu.b%>%
+  filter(Deployment==1)%>%
+  select(boat.stfile)%>%
+  distinct()
+
+
+qf19<-ftu.q%>%
+  filter(Deployment==0)%>%
+  select(stfile)%>%
+  distinct()
+
+qf20<-ftu.q%>%
+  filter(Deployment==1)%>%
+  select(stfile)%>%
+  distinct()
+
+### for Philina, run just once
+for (i in 1:length(wf19$boat.stfile)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", wf19$boat.stfile[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/boat_passage")
+}
+
+for (i in 1:length(wf20$boat.stfile)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", wf20$boat.stfile[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/boat_passage_1")
+}
+
+
+for (i in 1:nrow(qf19)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", qf19$stfile[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/quiet_period")
+}
+
+for (i in 1:nrow(qf20)){
+  file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", qf20$stfile[i]),
+    "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/quiet_period_1")
+}
+
+
+### for Steph, run just once
+for (i in 1:nrow(wf19)){
+  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
+    "E:/RCA_IN/April_July2019/boat_passage")
+}
+
+for (i in 1:nrow(qf19)){
+  file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
+    "E:/RCA_IN/April_July2019/quiet_period")
+}
 
 # FIGURES
 
