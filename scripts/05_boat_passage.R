@@ -4,19 +4,25 @@ library(lubridate)
 library(readxl)
 if (!require(filesstrings)) install.packages("filesstrings")
 library(filesstrings)
-### taking midnight ferry approach----
+
+### Taking ferry AIS approach----
+
 # Bring in data ----
 mv19 <- read_xlsx("odata/midnight_vessel.xlsx", sheet = "2019_RCA_In") # 2019 ais data
 mv20 <- read_xlsx("odata/midnight_vessel.xlsx", sheet = "2020_RCA_In") # 2020 ais data
 mv19am <- read_xlsx("odata/morning_vessel.xlsx", sheet = "2019_RCAIn") # 2020 ais data
 mv20am <- read_xlsx("odata/morning_vessel.xlsx", sheet = "2020_RCAIN") # 2020 ais data
 
-
 spl <- read_rds("wdata/spl_file.rds") %>%
   filter(site == "RCA_In") %>%
   rename(filedt = dt) # minute by minute spl data
-# organize data ----
 
+wthr <- read_rds("wdata/trimmed_hourly_weather.rds") %>%
+  select(wspeed, rca, Year = year, Month = month, Day = day, Hr = hr) %>%
+  filter(rca == "in") %>%
+  select(-rca)
+
+# Organize boat passage data ----
 mnv <- bind_rows(mv19, mv20) %>%
   arrange(DateTime) %>% # make sure dataset goes from earliest to latest
   # mutate(first_ferry=1) %>%
@@ -37,8 +43,7 @@ amv <- bind_rows(mv19am, mv20am) %>%
   pivot_longer(st:et, names_to = "tt", values_to = "tint") %>% # turn it in to a long data format so we
   mutate(direction = "departing") %>%
   rename(boatdt = DateTime) %>%
-  mutate(inter = row_number()) # trying just adding 1 so that morning passages are the even # following the odd for the prior midnight passage
-
+  mutate(inter = row_number()) # hoping that morning passages are the even numbers following the odd for the prior midnight passage
 
 # give each interval a number- using the find interval it assigns ID based on the row # of the first line in the
 # interval i.e., the interval between rows 1 and 2 is interval 1
@@ -54,8 +59,9 @@ amv <- bind_rows(mv19am, mv20am) %>%
 # hist(amv$Distance)
 
 
-spl$inter <- findInterval(spl$DateTime, mnv$tint) # assign intervals.
-# spl$inter<-findInterval(spl$DateTime,amv$tint)#assign intervals.
+### PM boat passage selection ----
+### define odd inters for PM boat passages ----
+spl$inter <- findInterval(spl$DateTime, mnv$tint) # assign intervals for midnight passages
 
 # I'm 99% sure all intervals we want are odd, but I'm running this bit of code just to make sure
 mnv2 <- mnv %>%
@@ -64,39 +70,36 @@ mnv2 <- mnv %>%
   select(-et) %>%
   rename(inter = st)
 
+# filter down only to intervals within 60 mins of the ferry passing (60 before or after)
 mn_spl <- spl %>%
-  filter(inter %in% mnv2$inter) %>% # filter down only to intervals within 60 mins of the ferry passing (60 before or after)
+  filter(inter %in% mnv2$inter) %>% 
   left_join(mnv2)
 
-wthr <- read_rds("wdata/trimmed_hourly_weather.rds") %>%
-  select(wspeed, rca, Year = year, Month = month, Day = day, Hr = hr) %>%
-  filter(rca == "in") %>%
-  select(-rca)
-
-
-# Need to subset down to dates earlier than May 4th, 2020
-spl3 <- mn_spl %>%
+mn_spl2 <- mn_spl %>%
   mutate(Hr = hour(DateTime)) %>% # create a date hr variable to link with wind
   left_join(wthr) %>% # join in wind
   group_by(inter) %>% # grouping by interval because some intervals span 2 hours
   mutate(wsp2 = mean(wspeed, na.rm = TRUE)) %>% # create a mean wind value for the interval
   filter(
-    # !is.na(wsp2) & wsp2 <20 &
-    DateTime < "2020-05-05"
-  ) %>% # subset down to intervals where there's not much wind before 5/5/20
+    # !is.na(wsp2) & wsp2 <20 & # remove windy days 
+    DateTime < "2020-05-05" # remove none continuous samples post 5/5/20
+  ) %>%
   mutate(
     dt2 = boatdt - minutes(7),
+    # create periods before the closest passage of the ferry and after
     tperiods = case_when(
       DateTime < dt2 ~ "pre",
       DateTime > boatdt ~ "post",
       DateTime > dt2 & DateTime < boatdt ~ "oth",
       DateTime == boatdt ~ "oth"
     )
-  ) %>% # create periods before the closest passage of the ferry and after
+  ) %>% 
   group_by(inter, tperiods) %>%
   mutate(
-    ferry.int = interval(boatdt - minutes(6), boatdt - minutes(1)), # create a ferry interval that is the 5 minutes before the closest passage
-    ferry.prd = if_else(DateTime %within% ferry.int, 1, 0), # create a new interval that indicates whether or not the minute is within the ferry interval
+    # create a ferry interval that is the 5 minutes before the closest passage
+    ferry.int = interval(boatdt - minutes(6), boatdt - minutes(1)), 
+    # create a new interval that indicates whether or not row is within the ferry interval
+    ferry.prd = if_else(DateTime %within% ferry.int, 1, 0), 
     pre.pst = case_when(
       tperiods == "pre" & ferry.prd != 1 & # find 5 minute periods in the period >5 min before closest passage
         zoo::rollmax(SPL, k = 5, fill = NA, align = "left") < 100 ~ 1, # where the maximum spl is < 100
@@ -107,25 +110,30 @@ spl3 <- mn_spl %>%
       tperiods == "oth" ~ 0
     ),
     post.pst = case_when(
-      tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") < 100 ~ 1, # find 5 minute periods in the post period where the maximum spl is < 100
+      # find 5 minute periods in the post period where the maximum spl is < 100
+      tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") < 100 ~ 1, 
       tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") > 100 ~ 0,
       tperiods == "post" & is.na(zoo::rollmax(SPL, k = 5, fill = NA, align = "right")) ~ 0,
       tperiods == "pre" ~ 0,
       tperiods == "oth" ~ 0
     ),
-    pt.int = ifelse(pre.pst == 1 | post.pst == 1, 1, 0) # create a new variable that indicates whether or not the minute is part of a potential interval
+    # create a new variable that indicates whether or not the minute is part of a potential interval
+    pt.int = ifelse(pre.pst == 1 | post.pst == 1, 1, 0) 
   ) %>%
   group_by(inter, tperiods, pt.int) %>%
   mutate(
-    pre.pst = ifelse(pre.pst == 1 & int_start(ferry.int) - DateTime == min(int_start(ferry.int) - DateTime), 1, 0), # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
+    # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
+    pre.pst = ifelse(pre.pst == 1 & int_start(ferry.int) - DateTime == min(int_start(ferry.int) - DateTime), 1, 0), 
+    # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
     post.pst = ifelse(post.pst == 1 & DateTime - boatdt == min(DateTime - boatdt), 1, 0)
-  ) %>% # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
+  ) %>% 
   ungroup(tperiods, pt.int) %>%
-  mutate(keep.inter = ifelse(sum(pre.pst) != 0 & sum(post.pst) != 0, 1, 0)) %>% # only keep intervals where there is a qualifying period in both pre and post ferry periods
+  # only keep intervals where there is a qualifying period in both pre and post ferry periods
+  mutate(keep.inter = ifelse(sum(pre.pst) != 0 & sum(post.pst) != 0, 1, 0)) %>% 
   filter(keep.inter == 1) %>%
   group_by(inter, tperiods)
 
-spl3a <- spl3 %>%
+mn_spl2a <- mn_spl2 %>%
   ungroup() %>%
   filter(ferry.prd == 1) %>%
   filter(Distance < 3000) %>% # only removes #57
@@ -133,26 +141,26 @@ spl3a <- spl3 %>%
   summarize(ferryspl = max(SPL)) %>%
   filter(ferryspl > 105) # find intervals where the ferry passage interval has a mean spl over 105
 
-spl3 <- filter(spl3, inter %in% spl3a$inter) # subset down to those intervals
+mn_spl2 <- filter(mn_spl2, inter %in% mn_spl2a$inter) # subset down to those intervals
 
 # calculate the pre-ferry period to analyze
-spl4 <- spl3 %>%
+mn_pre <- mn_spl2 %>%
   filter(pre.pst == 1) %>%
   ungroup() %>%
   select(inter, pre.dt = DateTime) %>%
   mutate(pre.int = interval(pre.dt, pre.dt + minutes(5)))
 
 # calculate the post-ferry period to analyze
-spl5 <- spl3 %>%
+mn_post <- mn_spl2 %>%
   filter(post.pst == 1) %>%
   ungroup() %>%
   select(inter, post.dt = DateTime) %>%
   mutate(post.int = interval(post.dt - minutes(5), post.dt))
 
-spl3 <- spl3 %>%
+mn_spl2 <- mn_spl2 %>%
   ungroup() %>%
-  left_join(spl4) %>%
-  left_join((spl5)) %>%
+  left_join(mn_pre) %>%
+  left_join((mn_post)) %>%
   mutate(
     pre.prd = if_else(DateTime %within% pre.int, 1, 0), # assign a 1 to minutes within the pre period
     post.prd = if_else(DateTime %within% post.int, 1, 0), # assign a 1 to minutes within the post period
@@ -164,9 +172,9 @@ spl3 <- spl3 %>%
     )
   ) # create a variable that indicates which period the minute belongs to
 # make figures to examine the spl profile of the candidate periods
-# interlist2<-unique(spl3$inter)
+# interlist2<-unique(mn_spl2$inter)
 # for(i in 1:length(interlist2)){
-#   p1<-spl3%>%
+#   p1<-mn_spl2%>%
 #     filter(inter==interlist2[i])
 #   ggplot(data=p1)+
 #     geom_line(aes(y=SPL,x=DateTime,group=inter))+
@@ -179,10 +187,10 @@ spl3 <- spl3 %>%
 #   ggsave(paste0("manual_figures/fig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_withperiods.jpg"))
 # }
 
-spl.inters <- spl3 %>%
+spl.inters <- mn_spl2 %>%
   filter(prd != "none")
 
-# create a dataset of sound trap files to use
+# create a dataset of PM sound trap files to use ----
 ftu <- spl.inters %>%
   dplyr::select(stfile, DateTime, filedt, inter, Year, Deployment, pre.int, ferry.int, post.int) %>%
   distinct() %>%
@@ -232,28 +240,27 @@ splq <- spl %>%
   mutate(isq = ifelse(SPL < 100, 1, 0), inter = inter - 1) # assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
 
 
-
-################
-### AM CODE ----
+### AM boat passage selection ----
 ### define even inters for AM boat passages ----
 splam <- spl %>% select(-inter)
-splam$inter <- findInterval(splam$DateTime, sort(amv$tint)) + 1 # assign intervals.
-# spl$inter<-findInterval(spl$DateTime,amv$tint)#assign intervals.
+# assign intervals such that morning passages are the even numbers following the odd for the prior midnight passage
+splam$inter <- findInterval(splam$DateTime, sort(amv$tint)) + 1 
+
 # length(unique(mnv$inter))
 # length(unique(amv$inter))
 
-# I'm 99% sure all intervals we want are odd, but I'm running this bit of code just to make sure
 amv2 <- amv %>%
   select(-tint) %>%
   pivot_wider(names_from = tt, values_from = inter) %>% # code used to find now corrected typo in xlsx: values_fn = length
   mutate(inter = st + 1) %>%
   select(-et, -st)
 
+# filter down only to intervals within 60 mins of the ferry passing (60 before or after)
 am_spl <- splam %>%
-  filter(inter %in% amv2$inter) %>% # filter down only to intervals within 60 mins of the ferry passing (60 before or after)
+  filter(inter %in% amv2$inter) %>% 
   left_join(amv2)
 
-spl3am <- am_spl %>%
+am_spl2 <- am_spl %>%
   mutate(Hr = hour(DateTime)) %>% # create a date hr variable to link with wind
   left_join(wthr) %>% # join in wind
   group_by(inter) %>% # grouping by interval because some intervals span 2 hours
@@ -261,20 +268,23 @@ spl3am <- am_spl %>%
   filter(
     # !is.na(wsp2) & wsp2 <20 &
     DateTime < "2020-05-05"
-  ) %>% # subset down to intervals where there's not much wind before 5/5/20
+  ) %>% 
   mutate(
     dt2 = boatdt - minutes(7),
     tperiods = case_when(
+      # create periods before the closest passage of the ferry and after
       DateTime < dt2 ~ "pre",
       DateTime > boatdt ~ "post",
       DateTime > dt2 & DateTime < boatdt ~ "oth",
       DateTime == boatdt ~ "oth"
     )
-  ) %>% # create periods before the closest passage of the ferry and after
+  ) %>% 
   group_by(inter, tperiods) %>%
   mutate(
-    ferry.int = interval(boatdt - minutes(6), boatdt - minutes(1)), # create a ferry interval that is the 5 minutes before the closest passage
-    ferry.prd = if_else(DateTime %within% ferry.int, 1, 0), # create a new interval that indicates whether or not the minute is within the ferry interval
+    # create a ferry interval that is the 5 minutes before the closest passage
+    ferry.int = interval(boatdt - minutes(6), boatdt - minutes(1)), 
+    # create a new interval that indicates whether or not the minute is within the ferry interval
+    ferry.prd = if_else(DateTime %within% ferry.int, 1, 0), 
     pre.pst = case_when(
       tperiods == "pre" & ferry.prd != 1 & # find 5 minute periods in the period >5 min before closest passage
         zoo::rollmax(SPL, k = 5, fill = NA, align = "left") < 100 ~ 1, # where the maximum spl is < 100
@@ -285,25 +295,30 @@ spl3am <- am_spl %>%
       tperiods == "oth" ~ 0
     ),
     post.pst = case_when(
-      tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") < 100 ~ 1, # find 5 minute periods in the post period where the maximum spl is < 100
+      # find 5 minute periods in the post period where the maximum spl is < 100
+      tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") < 100 ~ 1, 
       tperiods == "post" & zoo::rollmax(SPL, k = 5, fill = NA, align = "right") > 100 ~ 0,
       tperiods == "post" & is.na(zoo::rollmax(SPL, k = 5, fill = NA, align = "right")) ~ 0,
       tperiods == "pre" ~ 0,
       tperiods == "oth" ~ 0
     ),
-    pt.int = ifelse(pre.pst == 1 | post.pst == 1, 1, 0) # create a new variable that indicates whether or not the minute is part of a potential interval
+    # create a new variable that indicates whether or not the minute is part of a potential interval
+    pt.int = ifelse(pre.pst == 1 | post.pst == 1, 1, 0) 
   ) %>%
   group_by(inter, tperiods, pt.int) %>%
   mutate(
-    pre.pst = ifelse(pre.pst == 1 & int_start(ferry.int) - DateTime == min(int_start(ferry.int) - DateTime), 1, 0), # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
+    # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the pre-period
+    pre.pst = ifelse(pre.pst == 1 & int_start(ferry.int) - DateTime == min(int_start(ferry.int) - DateTime), 1, 0), 
+    # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
     post.pst = ifelse(post.pst == 1 & DateTime - boatdt == min(DateTime - boatdt), 1, 0)
-  ) %>% # find the minute that starts the closest interval to the ferry passage where max spl < 100 in the post-period
+  ) %>% 
   ungroup(tperiods, pt.int) %>%
-  mutate(keep.inter = ifelse(sum(pre.pst) != 0 & sum(post.pst) != 0, 1, 0)) %>% # only keep intervals where there is a qualifying period in both pre and post ferry periods
+  # only keep intervals where there is a qualifying period in both pre and post ferry periods
+  mutate(keep.inter = ifelse(sum(pre.pst) != 0 & sum(post.pst) != 0, 1, 0)) %>% 
   filter(keep.inter == 1) %>%
   group_by(inter, tperiods)
 
-spl3a2 <- spl3am %>%
+am_spl2a <- am_spl2 %>%
   ungroup() %>%
   filter(ferry.prd == 1) %>%
   filter(Distance < 3000) %>% # only removes #57
@@ -311,41 +326,42 @@ spl3a2 <- spl3am %>%
   summarize(ferryspl = max(SPL)) %>%
   filter(ferryspl > 105) # find intervals where the ferry passage interval has a mean spl over 105
 
-spl3am <- filter(spl3am, inter %in% spl3a2$inter) # subset down to those intervals
+am_spl2 <- filter(am_spl2, inter %in% am_spl2a$inter) # subset down to those intervals
 
 # calculate the pre-ferry period to analyze
-spl4am <- spl3am %>%
+am_pre <- am_spl2 %>%
   filter(pre.pst == 1) %>%
   ungroup() %>%
   select(inter, pre.dt = DateTime) %>%
   mutate(pre.int = interval(pre.dt, pre.dt + minutes(5)))
 
 # calculate the post-ferry period to analyze
-spl5am <- spl3am %>%
+am_post <- am_spl2 %>%
   filter(post.pst == 1) %>%
   ungroup() %>%
   select(inter, post.dt = DateTime) %>%
   mutate(post.int = interval(post.dt - minutes(5), post.dt))
 
-spl3am <- spl3am %>%
+am_spl2 <- am_spl2 %>%
   ungroup() %>%
-  left_join(spl4am) %>%
-  left_join((spl5am)) %>%
+  left_join(am_pre) %>%
+  left_join(am_post) %>%
   mutate(
     pre.prd = if_else(DateTime %within% pre.int, 1, 0), # assign a 1 to minutes within the pre period
     post.prd = if_else(DateTime %within% post.int, 1, 0), # assign a 1 to minutes within the post period
     prd = case_when(
+      # create a variable that indicates which period the minute belongs to
       pre.prd == 1 ~ "pre",
       post.prd == 1 ~ "post",
       ferry.prd == 1 ~ "ferry",
       pre.prd == 0 & post.prd == 0 & ferry.prd == 0 ~ "none"
     )
-  ) # create a variable that indicates which period the minute belongs to
-#
+  ) 
+
 # # make figures to examine the spl profile of the candidate periods
-# interlist2<-unique(spl3am$inter)
+# interlist2<-unique(am_spl2$inter)
 # for(i in 1:length(interlist2)){
-#   p1<-spl3am%>%
+#   p1<-am_spl2%>%
 #     filter(inter==interlist2[i])
 #   ggplot(data=p1)+
 #     geom_line(aes(y=SPL,x=DateTime,group=inter))+
@@ -358,12 +374,11 @@ spl3am <- spl3am %>%
 #   ggsave(paste0("manual_figures/fig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_am_boat.jpg"))
 # }
 
-
-spl.inters.am <- spl3am %>%
+spl.inters.am <- am_spl2 %>%
   filter(prd != "none")
 
-##########
-# create a dataset of AM sound trap files to use----
+
+# create a dataset of AM sound trap files to use ----
 ftuAM <- spl.inters.am %>%
   dplyr::select(stfile, DateTime, filedt, inter, Year, Deployment, pre.int, ferry.int, post.int) %>%
   distinct() %>%
@@ -392,14 +407,17 @@ fcpAM <- ftuAM %>% # get the files to use
     dymd = paste0(year(post), month(post), day(post)),
     pre2 = pre + minutes(5), # get the end of the pre-period
     ferry2 = ferry + minutes(5), # get the end of the ferry period
-    pf = difftime(ferry, pre2, units = "mins"), # calculate the length of time between the end of the pre-period and the start of the ferry period
-    fp = difftime(post, ferry2, units = "mins"), # calculate the length of time between the end of the ferry-period and the start of the post-period
+    # calculate the length of time between the end of the pre-period and the start of the ferry period
+    pf = difftime(ferry, pre2, units = "mins"), 
+    # calculate the length of time between the end of the ferry-period and the start of the post-period
+    fp = difftime(post, ferry2, units = "mins"), 
     midtimediff = fp + 10, # time diff between start of ferry and end of post
-    passlenAM = round(15 + pf + fp)
-  ) %>% # calculate how long the boat period is
+    passlenAM = round(15 + pf + fp) # calculate how long the boat period is
+  ) %>% 
   select(dymd, inter, passlenAM, pre, ferry, post, midtimediff) # only keep inter, post(start of the post period), and period length
 
-
+### START with AM ----
+# select AM quiet control periods ----
 splqAM <- splq %>% select(-Deployment, -inter)
 dtl <- unique(splqAM$dymd) # the days to evaluate
 splqAM$qpl <- NA # create the qpl (quiet period length) variable
@@ -411,7 +429,8 @@ for (i in 1:length(dtl)) {
     t1$qpl[1] <- ifelse(t1$isq[1] == 0, 0, 1) # assign the first qpl a 0 if isq = 0 otherwise 1
     t1$qpl[j] <- ifelse(t1$isq[j] == 0, 0, 1 + t1$qpl[j - 1]) # add to qpl as long as isq = 1
   }
-  ifelse(i == 1, splqAM2 <- t1, splqAM2 <- bind_rows(splqAM2, t1)) # create splq2 first time through the loop otherwise append splq2
+  # create splq2 first time through the loop otherwise append splq2
+  ifelse(i == 1, splqAM2 <- t1, splqAM2 <- bind_rows(splqAM2, t1)) 
 }
 
 splqAMall <- splqAM2 %>%
@@ -420,20 +439,22 @@ splqAMall <- splqAM2 %>%
   group_by(dymd) %>% # group by day
   mutate(
     maxqpl = round(max(qpl, na.rm = T)),
-    possible_eqp = if_else(qpl > passlenAM, 1, 0),
+    # assign a 1 to the end (last minute) of longest quiet period (eqp)
     eqp = if_else(qpl == maxqpl & maxqpl >= passlenAM, 1, 0),
     deltalen = maxqpl - passlenAM
-  ) %>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
+  ) %>% 
   filter(eqp == 1) %>%
   group_by(dymd) %>% # group by day
   mutate(
-    tgap = round(difftime(pre, DateTime, units = "mins")), # find the time gap (tgap) between the end of the post period and the end of the quiet period
+    # find the time gap (tgap) between the end of the post period and the end of the quiet period
+    tgap = round(difftime(pre, DateTime, units = "mins")), 
     mintgap = ifelse(tgap == min(tgap), 1, 0),
     minquiet = qpl - passlenAM,
     midquiet = round(qpl - midtimediff),
     maxquiet = qpl - 5,
+    # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period
     keep = ifelse(maxqpl >= passlenAM & mintgap == 1, 1, 0)
-  ) %>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period
+  ) %>%
   select(inter, tgap, eqtime = DateTime, qplength = maxqpl, passlen = passlenAM, minquiet, midquiet, maxquiet, keep)
 
 ftuAM2 <- ftuAM %>%
@@ -444,9 +465,10 @@ ftuAM2 <- ftuAM %>%
   ungroup() %>%
   mutate(
     # calculate the start of of each control period (one for each pre,ferry,and post period)
-    quiet = if_else(tgap >= 0, strt - passlen - tgap - minutes(1), strt - passlen - minutes(6)),
     # use 6 with negative tgaps to give a min 1 min break between end of quiet-post sample and start of boat-pre sample
-    # quiet_test=if_else(tgap>=0, eqtime - passlen - minutes(5), strt - passlen - minutes(5)), # test should be equal to quiet only for pre period
+    quiet = if_else(tgap >= 0, strt - passlen - tgap - minutes(1), strt - passlen - minutes(6)),
+    # # test should be equal to quiet only for pre period
+    # quiet_test=if_else(tgap>=0, eqtime - passlen - minutes(5), strt - passlen - minutes(5)), 
     qstrt = quiet, # this is the start of the 5 minute period to analyze
     pend = quiet + minutes(5), # this is the end of the 5 minute period to analyze
     qp_strt = eqtime - minutes(qplength + 1), # this is the start of the quiet period being sampled
@@ -456,8 +478,10 @@ ftuAM2 <- ftuAM %>%
   pivot_longer(qstrt:pend, names_to = "se", values_to = "quiet2") %>%
   filter(keep == 1)
 
-##############################
-### to quantify longest period of quiet after removing sampled times
+
+### PM CODE resumed ----
+### select PM quiet control periods ----
+# quantify longest period of quiet after removing AM sampled times
 # select quiet periods for only those passages retained
 # inter.used <- unique(ftuAM2$inter)
 fcp2 <- ftuAM2 %>%
@@ -471,18 +495,16 @@ fcp3 <- fcp2 %>%
   select(-quiet) %>%
   pivot_wider(names_from = "prd", values_from = "quiet.int")
 
-
 splqPM <- splq %>% # create a new splq dataset
   left_join(fcp3) %>% # join in the file to keep
   group_by(dymd) %>%
   mutate(
-    # maxqpl= max(qpl, na.rm = T),
     passlength = if_else(!is.na(passlen), passlen, 0),
+    # maxqpl= max(qpl, na.rm = T),
     # remainingqpl = if_else(!is.na(passlen), maxqpl-passlength-11, maxqpl), # subtract 11 for buffer
     # # truetgap=if_else(qpl==max(qpl, na.rm = T), tgap, NA_real_),
     # sampled = if_else( qpl>= max(qpl, na.rm = T)-passlength-11,1,0, missing = 0),
-    # isq=ifelse(SPL<100 & sampled == 0,1,0)# appears to be working but loses too many samples
-    sampled = if_else((DateTime %within% pre | DateTime %within% ferry | DateTime %within% post), 1, 0, missing = 0), # also works, but don't know how to proceed
+    sampled = if_else((DateTime %within% pre | DateTime %within% ferry | DateTime %within% post), 1, 0, missing = 0), 
     isq = if_else(SPL < 100 & sampled == 0, 1, 0)
   ) %>%
   select(-Deployment, -inter, -passlen, -pre, -ferry, -post, passlenAM = passlength)
@@ -497,7 +519,8 @@ for (i in 1:length(dtl)) {
     t1$qpl[1] <- ifelse(t1$isq[1] == 0, 0, 1) # assign the first qpl a 0 if isq = 0 otherwise 1
     t1$qpl[j] <- ifelse(t1$isq[j] == 0, 0, 1 + t1$qpl[j - 1]) # add to qpl as long as isq = 1
   }
-  ifelse(i == 1, splqPM2 <- t1, splqPM2 <- bind_rows(splqPM2, t1)) # create splq2 first time through the loop otherwise append splq2
+  # create splq2 first time through the loop otherwise append splq2
+  ifelse(i == 1, splqPM2 <- t1, splqPM2 <- bind_rows(splqPM2, t1)) 
 }
 
 splq3all <- splqPM2 %>% # create a new splq dataset
@@ -512,13 +535,16 @@ splq3all <- splqPM2 %>% # create a new splq dataset
   filter(!is.na(post)) %>% # get rid of lines where there isn't a start to the post period
   mutate(
     epost = post + minutes(5), # calculate the end of the post period.
-    tgap = difftime(DateTime, epost, units = "mins"), # find the time gap (tgap) between the end of the post period and the end of the quiet period
+    # find the time gap (tgap) between the end of the post period and the end of the quiet period
+    tgap = difftime(DateTime, epost, units = "mins"), 
     mintgap = ifelse(tgap == min(tgap), 1, 0),
-    minquiet = qplength - passlen - 6, # add in 6 min buffer at end of quiet period to keep separate from morning quiet period
+    # add in 6 min buffer at end of quiet period to keep separate from morning quiet period
+    minquiet = qplength - passlen - 6, 
     midquiet = qplength - midtimediff - 6,
     maxquiet = qplength - 5 - 6,
+    # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period
     keep = ifelse(qpl >= (passlen + 6) & mintgap == 1, 1, 0)
-  ) %>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
+  ) %>% 
   select(inter, tgap, eqtime = DateTime, qplength, passlen, minquiet, midquiet, maxquiet, keep)
 
 splq3 <- splq3all %>% filter(keep == 1) # remove deployment again
@@ -531,7 +557,8 @@ ftu2 <- ftu %>%
   filter(!is.na(dymd)) %>%
   ungroup() %>%
   mutate(
-    quiet = strt + tgap - minutes(6), # calculate the start of of each control period (one for each pre,ferry,and post period)
+    # calculate the start of of each control period (one for each pre,ferry,and post period)
+    quiet = strt + tgap - minutes(6), 
     qstrt = quiet, # this is the start of the 5 minute period to analyze
     pend = quiet + minutes(5),
     qp_strt = eqtime - minutes(qplength + 1),
@@ -541,6 +568,8 @@ ftu2 <- ftu %>%
   pivot_longer(qstrt:pend, names_to = "se", values_to = "quiet2") %>%
   filter(keep == 1) # remove deployment again
 
+
+### COMBINE ALL SELECTIONS ----
 # extract file names based on start and end times for quiet periods (quiet2)
 spl_quiet2 <- spl %>%
   mutate(quiet2 = DateTime) %>%
@@ -551,7 +580,7 @@ second(spl_quiet2$quiet2) <- 0
 second(ftu2$quiet2) <- 0
 second(ftuAM2$quiet2) <- 0
 
-
+# remove seconds for joining
 ftu.b <- ftu2 %>%
   select(Year, Deployment, inter, prd, strt, stfile = boat.stfile, into.file = boat.intofile) %>%
   mutate(
@@ -591,11 +620,12 @@ ftuAM.q <- ftuAM2 %>%
 # write.csv(ftuAM.b,"wdata/files_to_evaluate_boat_am.csv")
 # write.csv(ftuAM.q,"wdata/files_to_evaluate_quiet_am.csv")
 
-# list all files
 allfiles <- bind_rows(ftu.b, ftu.q, ftuAM.b, ftuAM.q) %>%
   arrange(strt) %>%
   mutate(timediff = signif((strt - lag(strt)) / 1, digits = 4), overlap = if_else(timediff < 5 * 60 & timediff > 0, T, F, missing = F))
 
+
+# check for overlap between selections ----
 samples_to_drop <- filter(allfiles, overlap == T) # none to drop if all working as planned :)
 
 allfiles2 <- allfiles %>%
@@ -604,7 +634,9 @@ allfiles2 <- allfiles %>%
 
 # write.csv(allfiles2,"wdata/files_to_evaluate_all.csv")
 
-# make figures to examine the spl profile of all quiet periods
+
+# FIGURES ----
+# make figures to examine the spl profile of all periods
 allinterspl <- spl %>%
   select(DateTime, Time, SPL) %>%
   # bind_rows(mn_spl, am_spl) %>% select(inter, DateTime, Time, SPL) %>%
@@ -642,6 +674,7 @@ for (i in 1:length(interlist2)) {
   ggsave(paste0("manual_figures/qfig_", paste0(inters[1]), "_", p2$year[1], p2$month[1], p2$day[1], ".jpg"))
 }
 
+# SAVE SELECTIONS ----
 all19data <- allfiles2 %>%
   filter(Deployment == 0) %>%
   select(Year, Deployment, inter, prd, type, stfile, strt, into.file)
@@ -652,7 +685,7 @@ all20data <- allfiles2 %>%
   select(Year, Deployment, inter, prd, type, stfile, strt, into.file)
 write.csv(all20data, "wdata/files_to_evaluate_20.csv")
 
-### move selected files to new folder
+### MOVE SELECTED FILES to new folders ----
 all19 <- allfiles2 %>%
   filter(Deployment == 0) %>%
   select(stfile) %>%
