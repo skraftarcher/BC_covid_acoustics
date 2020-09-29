@@ -453,7 +453,7 @@ ftuAM2 <- ftuAM %>%
   ungroup()%>%
   mutate(
     # calculate the start of of each control period (one for each pre,ferry,and post period)
-    quiet=if_else(tgap>=0, strt - passlen - tgap - minutes(1), strt -  passlen -  minutes(1)), # changed 5 min to 6 to give a min 1 min break between end of quiet-post sample and start of boat-pre sample
+    quiet=if_else(tgap>=0, strt - passlen - tgap - minutes(1), strt - passlen - minutes(6)), # changed to 6 to give a min 1 min break between end of quiet-post sample and start of boat-pre sample
     # quiet_test=if_else(tgap>=0, eqtime - passlen - minutes(5), strt - passlen - minutes(5)), # test should be equal to quiet only for pre period
     qstrt=quiet,# this is the start of the 5 minute period to analyze
     pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
@@ -559,10 +559,10 @@ splq3all<-splqPM2%>% #create a new splq dataset
   mutate(epost=post+minutes(5),# calculate the end of the post period.
          tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
          mintgap=ifelse(tgap==min(tgap),1,0),
-         minquiet=qplength-passlen-1, # add in 1 min buffer at end of quiet period to keep separate from morning quiet period
-         midquiet=qplength-midtimediff-1, 
-         maxquiet=qplength-5-1, 
-         keep=ifelse(qpl>=(passlen+1) & mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
+         minquiet=qplength-passlen-6, # add in 6 min buffer at end of quiet period to keep separate from morning quiet period
+         midquiet=qplength-midtimediff-6, 
+         maxquiet=qplength-5-6, 
+         keep=ifelse(qpl>=(passlen+6) & mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
   select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
 
 splq3 <- splq3all %>% filter(keep==1)# remove deployment again
@@ -574,7 +574,7 @@ ftu2<-ftu%>%
   left_join(splq3all)%>%
   filter(!is.na(dymd))%>%
   ungroup()%>%
-  mutate(quiet=strt+tgap-minutes(1),# calculate the start of of each control period (one for each pre,ferry,and post period)
+  mutate(quiet=strt+tgap-minutes(6),# calculate the start of of each control period (one for each pre,ferry,and post period)
          qstrt=quiet,# this is the start of the 5 minute period to analyze
          pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
   pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
