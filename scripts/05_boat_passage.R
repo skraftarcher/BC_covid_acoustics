@@ -219,21 +219,6 @@ splq<-spl%>%
       DateTime < "2020-05-05" & Hr < 5 & Hr >=1) %>% 
   mutate(isq=ifelse(SPL<100,1,0),inter=inter-1)#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
 
-# remove faulty inter assignment of 113 for both "201961" and "201962"
-splq[splq$dymd=="201962",]$inter <- NA
-
-dtl<-unique(splq$dymd)#the days to evaluate
-splq$qpl<-NA  #create the qpl (quiet period length) variable
-
-#for loop to calculate length of different quiet period stretches
-for(i in 1:length(dtl)){
-  t1=filter(splq,dymd==dtl[i])# subset down to a single night
-  for(j in 2:nrow(t1)){
-    t1$qpl[1]<-ifelse(t1$isq[1]==0,0,1)# assign the first qpl a 0 if isq = 0 otherwise 1
-    t1$qpl[j]<-ifelse(t1$isq[j]==0,0,1+t1$qpl[j-1])# add to qpl as long as isq = 1
-  }
-  ifelse(i==1,splq2<-t1, splq2<-bind_rows(splq2,t1))# create splq2 first time through the loop otherwise append splq2
-}
 
 # this is where it gets super inefficient
 fcp<-ftu%>% # get the files to use
@@ -250,146 +235,12 @@ fcp<-ftu%>% # get the files to use
          passlen=15+pf+fp)%>% #calculate how long the boat period is
   select(inter, dymd, post,passlen, midtimediff)# only keep inter, post(start of the post period), and period length
 
-splq3all<-splq2%>% #create a new splq dataset
-  group_by(dymd)%>% # group by day
-  mutate(qplength=max(qpl),
-         eqp=ifelse(qpl==max(qpl),1,0))%>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
-  filter(eqp==1)%>%# only keep the end of the quiet period
-  select(-Deployment)%>%# remove deployment
-  left_join(fcp)%>%# join in the file to keep
-  filter(!is.na(post))%>%# get rid of lines where there isn't a start to the post period
-  mutate(epost=post+minutes(5),# calculate the end of the post period.
-         tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
-         mintgap=ifelse(tgap==min(tgap),1,0),
-         minquiet=qplength-passlen-11, # add in 6 min buffer at end of quiet period to allow for morning pre passage period
-         midquiet=qplength-midtimediff-11, 
-         maxquiet=qplength-5-11, 
-         keep=ifelse(qpl>=(passlen+11) & mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
-  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
 
-splq3 <- splq3all %>% filter(keep==1)# remove deployment again
-
-ftu2<-ftu%>%
-  select(Year,Deployment,inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
-  # filter(inter !%in% )%>% #remove passages with overlap probles
-  distinct()%>%
-  left_join(splq3all)%>%
-  filter(!is.na(dymd))%>%
-  ungroup()%>%
-  mutate(quiet=strt+tgap-minutes(11),# calculate the start of of each control period (one for each pre,ferry,and post period)
-         qstrt=quiet,# this is the start of the 5 minute period to analyze
-         pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
-  pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
-  filter(keep==1)# remove deployment again
-second(ftu2$quiet2)<-0
-
-splq4<-spl%>%
-  mutate(quiet2=DateTime)%>%
-  select(-inter)
-second(splq4$quiet2)<-0
-
-ftu.b<-ftu2%>%
-  select(Year,Deployment,inter,prd, strt, stfile = boat.stfile, into.file = boat.intofile)%>%
-  mutate(type = "boat")%>%
-  distinct()
-
-ftu.q<-ftu2%>%
-  select(Year,Deployment,inter,prd,quiet,quiet2)%>%
-  left_join(splq4)%>%
-  mutate(into.file=quiet-filedt,
-    type = "quiet")%>%
-  select(Year,Deployment,inter,prd, strt=quiet, stfile, into.file, type)%>%
-  distinct()
-
-# write.csv(ftu.b,"wdata/files_to_evaluate_boat_mn.csv")
-# write.csv(ftu.q,"wdata/files_to_evaluate_quiet_mn.csv")
-
-### move selected files to new folder
-
-wf19<-ftu.b%>%
-  filter(Deployment==0)%>%
-  select(stfile)%>%
-  distinct()
-
-wf20<-ftu.b%>%
-  filter(Deployment==1)%>%
-  select(stfile)%>%
-  distinct()
-
-
-qf19<-ftu.q%>%
-  filter(Deployment==0)%>%
-  select(stfile)%>%
-  distinct()
-
-qf20<-ftu.q%>%
-  filter(Deployment==1)%>%
-  select(stfile)%>%
-  distinct()
-
-# ### for Philina, run just once
-# for (i in 1:length(wf19$boat.stfile)){
-#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", wf19$boat.stfile[i]),
-#     "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/boat_passage")
-# }
-# 
-# for (i in 1:length(wf20$boat.stfile)){
-#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", wf20$boat.stfile[i]),
-#     "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/boat_passage_1")
-# }
-# 
-# 
-# for (i in 1:nrow(qf19)){
-#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", qf19$stfile[i]),
-#     "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/quiet_period")
-# }
-# 
-# for (i in 1:nrow(qf20)){
-#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", qf20$stfile[i]),
-#     "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/quiet_period_1")
-# }
-# 
-# 
-# ### for Steph, run just once
-# for (i in 1:nrow(wf19)){
-#   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
-#     "E:/RCA_IN/April_July2019/boat_passage")
-# }
-# 
-# for (i in 1:nrow(qf19)){
-#   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
-#     "E:/RCA_IN/April_July2019/quiet_period")
-# }
-
-# FIGURES FOR MN QUIET SAMPLES #####
-# 
-# splq3<-splq3all%>% filter(keep==1)
-# 
-# all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
-# hist(all.qp.lengths, breaks = 30)
-# 
-# interlist2<-unique(ftu.q$inter)
-# 
-# 
-# for(i in 1:length(interlist2)){
-#   p1<-splq%>%
-#     filter(inter==interlist2[i])
-#   p2 <- ftu.q %>% filter(inter==interlist2[i])
-#   
-#   ggplot(data=p1)+
-#     geom_line(aes(y=SPL,x=DateTime))+
-#     geom_segment(data=p2, aes(y=88, yend=88, x=quiet, xend= (quiet + minutes(5)), color=prd),size=1.5, inherit.aes = F)+
-#     scale_color_manual(values=c("red","orange","orange"),name="Potential interval")+
-#     theme_bw()+
-#     # geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
-#     scale_x_datetime(date_minor_breaks="5 mins")+
-#     coord_cartesian(ylim=c(85,120)) +
-#     theme(legend.position="none")
-#   ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_100.jpg"))
-# }
 
 ################
-### NEW CODE ###
+### AM CODE ###
+
+#### try to make AM passages first? ####
 ### define even inters for AM boat passages ####
 splam <- spl %>% select(-inter)
 splam$inter<-findInterval(splam$DateTime,sort(amv$tint)) + 1#assign intervals. 
@@ -416,7 +267,7 @@ spl3am <- am_spl%>%
   group_by(inter)%>% # grouping by interval because some intervals span 2 hours
   mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
   filter(#!is.na(wsp2) & wsp2 <20 & 
-      DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
+    DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
   mutate(dt2=boatdt-minutes(7),
     tperiods=case_when(
       DateTime<dt2~"pre",
@@ -539,38 +390,7 @@ fcpAM <- ftuAM %>% # get the files to use
   select(dymd, inter, passlenAM, pre, ferry, post, midtimediff)# only keep inter, post(start of the post period), and period length
 
 
-##############################
-### to quantify longest period of quiet after removing sampled times
-inter.used <- unique(ftu.b$inter) 
-
-# select quiet periods for only those passages retained
-fcp2 <- ftu2 %>% filter (inter %in% inter.used) %>% 
-  select(dymd, prd, quiet, passlen) %>% distinct()
-
-
-# calculate the quiet periods analyzes for PM passage
-fcp3<-fcp2%>%
-  ungroup()%>%
-  mutate(quiet.int=interval(quiet,quiet+minutes(5))) %>% 
-  select(-quiet) %>%
-  pivot_wider(names_from = "prd", values_from = "quiet.int")
-
-splqAM <- splq %>% #create a new splq dataset
-  left_join(fcp3)%>%# join in the file to keep
-  group_by(dymd)%>%
-  mutate(
-    # maxqpl= max(qpl, na.rm = T),
-    passlength = if_else(!is.na(passlen), passlen, 0),
-    # remainingqpl = if_else(!is.na(passlen), maxqpl-passlength-11, maxqpl), # subtract 11 for buffer
-    # # truetgap=if_else(qpl==max(qpl, na.rm = T), tgap, NA_real_),
-    # sampled = if_else( qpl>= max(qpl, na.rm = T)-passlength-11,1,0, missing = 0),
-    # isq=ifelse(SPL<100 & sampled == 0,1,0)# appears to be working but loses too many samples
-    sampled=if_else((DateTime %within% pre | DateTime %within% ferry  | DateTime %within% post),1,0, missing = 0), # also works, but don't know how to proceed
-    isq=if_else(SPL<100 & sampled == 0
-      ,1,0)
-  ) %>%
-  select(-Deployment, -inter, -passlen, -pre, -ferry, -post, passlenPM = passlength) 
-
+splqAM <- splq  %>% select(-Deployment, -inter)
 dtl<-unique(splqAM$dymd)#the days to evaluate
 splqAM$qpl<-NA  #create the qpl (quiet period length) variable
 # check <- filter(splqAM, inter == 141)
@@ -596,7 +416,7 @@ splqAMall <- splqAM2 %>%
     possible_eqp=if_else(qpl>passlenAM,1,0),
     eqp=if_else(qpl==maxqpl & maxqpl>=passlenAM,1,0),
     deltalen = maxqpl-passlenAM
-    )%>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
+  )%>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
   # filter(possible_eqp==1)%>%# only keep the end of the quiet period
   # mutate(
   #   count = n(),
@@ -606,7 +426,7 @@ splqAMall <- splqAM2 %>%
   #     # qpl<=passlenAM~0,
   #     qp_count == 1 & qpl==max(qpl)~1,
   #     qp_count == 2 & qpl>passlenAM~1)) %>%
-    filter(eqp==1)%>%
+  filter(eqp==1)%>%
   group_by(dymd)%>% # group by day
   mutate(      
     #code from PM
@@ -677,6 +497,195 @@ all20am<-allAMfiles%>%
   filter(Deployment==1)%>%
   select(stfile)%>%
   distinct()
+
+
+##############################
+### to quantify longest period of quiet after removing sampled times
+inter.used <- unique(ftuAM.b$inter) 
+
+# select quiet periods for only those passages retained
+fcp2 <- ftuAM2 %>% filter (inter %in% inter.used) %>% 
+  select(dymd, prd, quiet, passlen) %>% distinct()
+
+
+# calculate the quiet periods analyzes for PM passage
+fcp3<-fcp2%>%
+  ungroup()%>%
+  mutate(quiet.int=interval(quiet,quiet+minutes(5))) %>% 
+  select(-quiet) %>%
+  pivot_wider(names_from = "prd", values_from = "quiet.int")
+
+
+
+# remove faulty inter assignment of 113 for both "201961" and "201962"
+splq[splq$dymd=="201962",]$inter <- NA
+
+splqPM <- splq %>% #create a new splq dataset
+  left_join(fcp3)%>%# join in the file to keep
+  group_by(dymd)%>%
+  mutate(
+    # maxqpl= max(qpl, na.rm = T),
+    passlength = if_else(!is.na(passlen), passlen, 0),
+    # remainingqpl = if_else(!is.na(passlen), maxqpl-passlength-11, maxqpl), # subtract 11 for buffer
+    # # truetgap=if_else(qpl==max(qpl, na.rm = T), tgap, NA_real_),
+    # sampled = if_else( qpl>= max(qpl, na.rm = T)-passlength-11,1,0, missing = 0),
+    # isq=ifelse(SPL<100 & sampled == 0,1,0)# appears to be working but loses too many samples
+    sampled=if_else((DateTime %within% pre | DateTime %within% ferry  | DateTime %within% post),1,0, missing = 0), # also works, but don't know how to proceed
+    isq=if_else(SPL<100 & sampled == 0,1,0)
+  ) %>%
+  select(-Deployment, -inter, -passlen, -pre, -ferry, -post, passlenAM = passlength)
+
+dtl<-unique(splqPM$dymd)#the days to evaluate
+splqPM$qpl<-NA  #create the qpl (quiet period length) variable
+
+#for loop to calculate length of different quiet period stretches
+for(i in 1:length(dtl)){
+  t1=filter(splqPM,dymd==dtl[i])# subset down to a single night
+  for(j in 2:nrow(t1)){
+    t1$qpl[1]<-ifelse(t1$isq[1]==0,0,1)# assign the first qpl a 0 if isq = 0 otherwise 1
+    t1$qpl[j]<-ifelse(t1$isq[j]==0,0,1+t1$qpl[j-1])# add to qpl as long as isq = 1
+  }
+  ifelse(i==1,splqPM2<-t1, splqPM2<-bind_rows(splqPM2,t1))# create splq2 first time through the loop otherwise append splq2
+}
+
+splq3all<-splqPM2%>% #create a new splq dataset
+  group_by(dymd)%>% # group by day
+  mutate(qplength=max(qpl),
+         eqp=ifelse(qpl==max(qpl),1,0))%>% # assign a 1 to the end (last minute) of longest quiet period (eqp)
+  filter(eqp==1)%>%# only keep the end of the quiet period
+  # select(-Deployment)%>%# remove deployment
+  left_join(fcp)%>%# join in the file to keep
+  filter(!is.na(post))%>%# get rid of lines where there isn't a start to the post period
+  mutate(epost=post+minutes(5),# calculate the end of the post period.
+         tgap=difftime(DateTime,epost,units="mins"),# find the time gap (tgap) between the end of the post period and the end of the quiet period
+         mintgap=ifelse(tgap==min(tgap),1,0),
+         minquiet=qplength-passlen-1, # add in 1 min buffer at end of quiet period to keep separate from morning quiet period
+         midquiet=qplength-midtimediff-1, 
+         maxquiet=qplength-5-1, 
+         keep=ifelse(qpl>=(passlen+1) & mintgap==1,1,0))%>% # find intervals to keep, only keep those where the quiet period is at least as long as the boat pasage period.
+  select(inter,tgap,eqtime=DateTime,qplength,passlen,minquiet, midquiet,maxquiet,keep)
+
+splq3 <- splq3all %>% filter(keep==1)# remove deployment again
+
+ftu2<-ftu%>%
+  select(Year,Deployment,inter,prd,strt,boat.stfile=stfile,boat.intofile=into.file)%>%
+  # filter(inter !%in% )%>% #remove passages with overlap probles
+  distinct()%>%
+  left_join(splq3all)%>%
+  filter(!is.na(dymd))%>%
+  ungroup()%>%
+  mutate(quiet=strt+tgap-minutes(1),# calculate the start of of each control period (one for each pre,ferry,and post period)
+         qstrt=quiet,# this is the start of the 5 minute period to analyze
+         pend=quiet+minutes(5))%>%# this is the end of the 5 minute period to analyze
+  pivot_longer(qstrt:pend,names_to="se",values_to="quiet2")%>%# pivot longer so that the start and end times are in a single variable
+  filter(keep==1)# remove deployment again
+second(ftu2$quiet2)<-0
+
+splq4<-spl%>%
+  mutate(quiet2=DateTime)%>%
+  select(-inter)
+second(splq4$quiet2)<-0
+
+ftu.b<-ftu2%>%
+  select(Year,Deployment,inter,prd, strt, stfile = boat.stfile, into.file = boat.intofile)%>%
+  mutate(type = "boat")%>%
+  distinct()
+
+ftu.q<-ftu2%>%
+  select(Year,Deployment,inter,prd,quiet,quiet2)%>%
+  left_join(splq4)%>%
+  mutate(into.file=quiet-filedt,
+    type = "quiet")%>%
+  select(Year,Deployment,inter,prd, strt=quiet, stfile, into.file, type)%>%
+  distinct()
+
+# write.csv(ftu.b,"wdata/files_to_evaluate_boat_mn.csv")
+# write.csv(ftu.q,"wdata/files_to_evaluate_quiet_mn.csv")
+
+### move selected files to new folder
+
+wf19<-ftu.b%>%
+  filter(Deployment==0)%>%
+  select(stfile)%>%
+  distinct()
+
+wf20<-ftu.b%>%
+  filter(Deployment==1)%>%
+  select(stfile)%>%
+  distinct()
+
+
+qf19<-ftu.q%>%
+  filter(Deployment==0)%>%
+  select(stfile)%>%
+  distinct()
+
+qf20<-ftu.q%>%
+  filter(Deployment==1)%>%
+  select(stfile)%>%
+  distinct()
+
+# ### for Philina, run just once
+# for (i in 1:length(wf19$boat.stfile)){
+#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", wf19$boat.stfile[i]),
+#     "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/boat_passage")
+# }
+# 
+# for (i in 1:length(wf20$boat.stfile)){
+#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", wf20$boat.stfile[i]),
+#     "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/boat_passage_1")
+# }
+# 
+# 
+# for (i in 1:nrow(qf19)){
+#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/1342218252/", qf19$stfile[i]),
+#     "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/quiet_period")
+# }
+# 
+# for (i in 1:nrow(qf20)){
+#   file.move(paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/RCAin_200418_1505_5047/", qf20$stfile[i]),
+#     "/Volumes/SPERA_Rf_3_backup/RCA_IN_2020/quiet_period_1")
+# }
+# 
+# 
+# ### for Steph, run just once
+# for (i in 1:nrow(wf19)){
+#   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",wf19$stfile.boat[i]),
+#     "E:/RCA_IN/April_July2019/boat_passage")
+# }
+# 
+# for (i in 1:nrow(qf19)){
+#   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",qf19$stfile.strt[i]),
+#     "E:/RCA_IN/April_July2019/quiet_period")
+# }
+
+# # FIGURES FOR MN QUIET SAMPLES #####
+# 
+# splq3<-splq3all%>% filter(keep==1)
+# 
+# all.qp.lengths <- as.numeric(round(sort(c(splq3$minquiet,splq3$midquiet,splq3$maxquiet))))
+# hist(all.qp.lengths, breaks = 30)
+# 
+# interlist2<-unique(ftu.q$inter)
+# 
+# 
+# for(i in 1:length(interlist2)){
+#   p1<-splq%>%
+#     filter(inter==interlist2[i])
+#   p2 <- ftu.q %>% filter(inter==interlist2[i])
+# 
+#   ggplot(data=p1)+
+#     geom_line(aes(y=SPL,x=DateTime))+
+#     geom_segment(data=p2, aes(y=88, yend=88, x=strt, xend= (strt + minutes(5)), color=prd),size=1.5, inherit.aes = F)+
+#     scale_color_manual(values=c("red","orange","orange"),name="Potential interval")+
+#     theme_bw()+
+#     # geom_vline(aes(xintercept=dt),color="red",linetype="dashed")+
+#     scale_x_datetime(date_minor_breaks="5 mins")+
+#     coord_cartesian(ylim=c(85,120)) +
+#     theme(legend.position="none")
+#   ggsave(paste0("manual_figures/qfig_",interlist2[i],"_",p1$Year[i],p1$Month[i],p1$Day[i],"_100.jpg"))
+# }
+
 
 # 2019 conflicts... 
 intersect(qf19, all19am)
