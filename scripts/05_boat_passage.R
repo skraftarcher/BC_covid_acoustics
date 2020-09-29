@@ -79,7 +79,7 @@ spl3<-mn_spl%>%
   group_by(inter)%>% # grouping by interval because some intervals span 2 hours
   mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
   filter(
-      !is.na(wsp2) & wsp2 <20 & 
+      # !is.na(wsp2) & wsp2 <20 &
       DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
   mutate(dt2=boatdt-minutes(7),
          tperiods=case_when(
@@ -185,15 +185,6 @@ ftu <- spl.inters%>%
     into.file=strt-filedt)%>%
   select(-pre.int,-ferry.int,-post.int)
 
-### quantify longest periods of quiet
-splq<-spl%>%
-  mutate(Hr=hour(DateTime),dymd=paste0(Year,Month,Day))%>% # create a date hr variable to link with wind
-  left_join(wthr)%>% # join in wind
-  filter(
-    wspeed <20 & !is.na(wspeed) &
-      DateTime < "2020-05-05" & Hr < 5 & Hr >=1) %>% 
-  mutate(isq=ifelse(SPL<100,1,0),inter=inter-1)#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
-
 
 # this is where it gets super inefficient
 fcp<-ftu%>% # get the files to use
@@ -209,6 +200,18 @@ fcp<-ftu%>% # get the files to use
          midtimediff=fp+10,
          passlen=15+pf+fp)%>% #calculate how long the boat period is
   select(inter, dymd, post,passlen, midtimediff)# only keep inter, post(start of the post period), and period length
+
+### quantify longest periods of quiet
+splq<-spl%>%
+  mutate(Hr=hour(DateTime),dymd=paste0(Year,Month,Day))%>% # create a date hr variable to link with wind
+  left_join(wthr)%>% # join in wind
+  group_by(Hr)%>%
+  mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
+  filter(
+    # !is.na(wsp2) & wsp2 <20 &
+      DateTime < "2020-05-05" & Hr < 5 & Hr >=1) %>% 
+  ungroup()%>%
+  mutate(isq=ifelse(SPL<100,1,0),inter=inter-1)#assign isq (is quiet) a 1 if the spl is less than 105, 0 otherwise
 
 
 
@@ -230,8 +233,6 @@ amv2<-amv%>%
   mutate(inter=st+1)%>%
   select(-et, -st)
 
-# amv$inter <- amv$inter + 1
-
 am_spl <- splam %>%
   filter(inter %in% amv2$inter)%>% # filter down only to intervals within 60 mins of the ferry passing (60 before or after)
   left_join(amv2)
@@ -241,7 +242,8 @@ spl3am <- am_spl%>%
   left_join(wthr)%>% # join in wind
   group_by(inter)%>% # grouping by interval because some intervals span 2 hours
   mutate(wsp2=mean(wspeed,na.rm = TRUE))%>% # create a mean wind value for the interval
-  filter(!is.na(wsp2) & wsp2 <20 & 
+  filter(
+    # !is.na(wsp2) & wsp2 <20 &
     DateTime < "2020-05-05")%>% # subset down to intervals where there's not much wind before 5/5/20
   mutate(dt2=boatdt-minutes(7),
     tperiods=case_when(
@@ -638,17 +640,17 @@ qf20<-ftu.q%>%
 #     "E:/RCA_IN/April_July2019/quiet_period")
 # }
 
-
-
 # 2019 conflicts... 
+# intersect(qf19, wf19)
 intersect(qf19, all19am)
+
 # 2020 conflicts... 
+# intersect(qf20, wf20)
 intersect(qf20, all20am)
+
 # duplicate these sets of files only for use in separate work spaces?
 
-
 #list all files
-
 allfiles <- bind_rows(ftu.b, ftu.q, ftuAM.b, ftuAM.q) %>% arrange(strt) %>% 
   mutate(timediff = signif((strt - lag(strt))/1, digits = 4), overlap = if_else(timediff<5*60 & timediff>0, T, F, missing = F))
 
@@ -660,13 +662,12 @@ allfiles2 <- allfiles %>%
 
 # write.csv(allfiles2,"wdata/files_to_evaluate_all.csv")
 
-
 # make figures to examine the spl profile of all quiet periods
 allinterspl <- spl %>% select(DateTime, Time, SPL) %>% 
   #bind_rows(mn_spl, am_spl) %>% select(inter, DateTime, Time, SPL) %>% 
   mutate(hr = hour(DateTime),
     dymd=paste0(year(DateTime),month(DateTime),day(DateTime)))  %>%
-  filter(hr < 6) 
+  filter(hr < 7) 
 
 interlist2<-unique(allfiles2$dymd)
 
