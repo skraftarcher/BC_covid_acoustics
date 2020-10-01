@@ -678,12 +678,12 @@ for (i in 1:length(interlist2)) {
 all19data <- allfiles2 %>%
   filter(Deployment == 0) %>%
   select(Year, Deployment, inter, prd, type, stfile, strt, into.file)
-write.csv(all19data, "wdata/files_to_evaluate_19.csv")
+write.csv(all19data, "wdata/periods_to_evaluate_19.csv")
 
 all20data <- allfiles2 %>%
   filter(Deployment == 1) %>%
   select(Year, Deployment, inter, prd, type, stfile, strt, into.file)
-write.csv(all20data, "wdata/files_to_evaluate_20.csv")
+write.csv(all20data, "wdata/periods_to_evaluate_20.csv")
 
 ### MOVE SELECTED FILES to new folders ----
 all19 <- allfiles2 %>%
@@ -697,6 +697,7 @@ all20 <- allfiles2 %>%
   distinct()
 
 write.csv(all19, "wdata/files_list_for_2019.csv")
+write.csv(all20, "wdata/files_list_for_2020.csv")
 
 # ### for Philina, run just once
 # for (i in 1:nrow(all19)){
