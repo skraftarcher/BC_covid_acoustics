@@ -7,6 +7,20 @@ library(here)
 library(lubridate)
 library(tidyverse)
 
+
+# code to change file paths for mac
+# #load data ----
+# bp<-imp_raven(path = here("w.selection.tables"),
+#   files = "boat_passage_prelim.txt",
+#   all.data = TRUE)
+# colnames(bp)<-c("selection","view","channel","begin.time","end.time","low.freq","peak.freq","high.freq","delta.freq","delta.power","delta.time","file.off","begin.path","begin.file","class","sound.type","int","prd","comments")
+# 
+# bp$begin.path <- stringr::str_replace_all(bp, "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+# 
+# write_csv(bp, "boat_passage_prelim_mac.csv")
+
+
+
 #load data ----
 bp<-imp_raven(path = here("selection.tables"),
                  files = "boat_passage.txt",
