@@ -626,7 +626,8 @@ allfiles <- bind_rows(ftu.b, ftu.q, ftuAM.b, ftuAM.q) %>%
 
 
 # check for overlap between selections ----
-samples_to_drop <- filter(allfiles, overlap == T) # none to drop if all working as planned :)
+# none to drop if all working as planned :)
+samples_to_drop <- filter(allfiles, overlap == T) 
 
 allfiles2 <- allfiles %>%
   filter(!(inter %in% unique(samples_to_drop$inter))) %>%
@@ -716,3 +717,55 @@ write.csv(all20, "wdata/files_list_for_2020.csv")
 #   file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",all19$stfile[i]),
 #     "E:/RCA_IN/April_July2019/allboatpassage19")
 # }
+
+
+# Code to match with old "inter"
+
+# oldinter <- read_xlsx("files_to_evaluate_boat_061920.xlsx", sheet = "files_to_evaluate_boat_061920") %>%  
+oldinter <- read_xlsx("wdata/files_to_evaluate_boat.xlsx", sheet = "files_to_evaluate_boat") %>%    
+  select(oldinter = inter, stfile = stfile.boat) %>% 
+  mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
+  select(-stfile) %>% distinct()
+
+oldinter
+
+
+newinter <- allfiles2 %>% select(inter, stfile) %>% 
+  mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
+  select(-stfile) %>% distinct()
+
+newinter <- newinter[is.odd(newinter$inter),]
+
+# matchedinter <- left_join(newinter, oldinter)
+# 
+# unique(matchedinter$oldinter)
+# 
+# # stephdid <- c(29, 91, 105, 113, 117,125)
+# 
+# matchedinter <- filter(matchedinter, oldinter %in% stephdid) 
+# 
+# is.odd <- function(v) v %% 2 != 0
+# 
+# matchedinter[is.odd(matchedinter$newinter),]
+# 
+
+# code to change file paths for mac
+# #load data ----
+# bp<-imp_raven(path = here("w.selection.tables"),
+#   files = "boat_passage_prelim.txt",
+#   all.data = TRUE)
+# colnames(bp)<-c("selection","view","channel","begin.time","end.time","low.freq","peak.freq","high.freq","delta.freq","delta.power","delta.time","file.off","begin.path","begin.file","class","sound.type","int","prd","comments")
+# 
+# bp$begin.path <- stringr::str_replace_all(bp, "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+# 
+# write_csv(bp, "boat_passage_prelim_mac.csv")
+
+stephs_boat_pass <- read_csv("w.selection.tables/boat_passage_prelim_mac.csv") %>%  
+  mutate(dymd = gsub("1342218252.", "", begin.file), dymd = substr(dymd,1,nchar(dymd)-10)) 
+
+
+matchedinter <- left_join(stephs_boat_pass, newinter)
+
+
+
+
