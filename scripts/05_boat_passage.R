@@ -757,6 +757,14 @@ allmatchedinter <- bind_rows(matchedinter, matchedinter2) %>%
   # remove repetitive columns
   select(-stfile, -inter)
 
+# correct common typos
+allmatchedinter[16] <- case_when(
+  allmatchedinter[16]=="knock"~"knock",
+  allmatchedinter[16]=="KNOCK"~"knock",
+  allmatchedinter[16]=="grunt"~"grunt",
+  allmatchedinter[16]=="grutn"~"grunt",
+  allmatchedinter[16]=="grrunt"~"grunt")
+
 # save windows version
 write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
