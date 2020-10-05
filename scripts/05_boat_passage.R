@@ -719,48 +719,65 @@ write.csv(all20, "wdata/files_list_for_2020.csv")
 # }
 
 
-# Code to match old and new "inter" from selection tables? ----
-
-# # oldinter <- read_xlsx("files_to_evaluate_boat_061920.xlsx", sheet = "files_to_evaluate_boat_061920") %>%  
-# oldinter <- read_xlsx("wdata/files_to_evaluate_boat.xlsx", sheet = "files_to_evaluate_boat") %>%    
-#   select(oldinter = inter, stfile = stfile.boat) %>% 
-#   # mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
-#   select(-stfile) %>% distinct()
-# oldinter
+# Code to extract retained and reliable "Intervals" from selection tables ----
 
 newinter <- filter(allfiles2, type== "boat" ) %>% select(inter, stfile) %>% 
   group_by(inter, stfile) %>%
-  # mutate(#dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10))
-  # select(-stfile) %>% 
   distinct()
 
 # remove morning passages since they weren't in first set of selections
 is.odd <- function(v) v %% 2 != 0
 newinter <- newinter[is.odd(newinter$inter),]
 
+# load first selection table created (bp1)
+bp1<-imp_raven(path = here("w.selection.tables"),
+  # files = "boat_passage_prelim.txt",
+  files = "boat_passage_old.txt",
+  all.data = TRUE) 
+
+bp1[21]<- bp1[14]
+colnames(bp1)[21] <- "stfile"
+
+# remove intervals not to be used anymore
+matchedinter <- left_join(bp1, newinter) %>% filter(!is.na(inter)) 
+
+# get selections from second selection table (bp2)
+bp2<-imp_raven(path = here("w.selection.tables"), files = "boat_passage_2nd.txt", all.data = TRUE) 
+bp2[21]<- bp2[14]
+colnames(bp2)[21] <- "stfile"
+
+# filter out intervals already present in bp1
+oldinters <- unique(matchedinter$inter)
+matchedinter2 <- left_join(bp2, newinter) %>% filter(!(Interval %in% oldinters) & !is.na(inter)) 
+
+# combine all selections 
+allmatchedinter <- bind_rows(matchedinter, matchedinter2) %>% 
+  # name column indicating which selection table row comes from
+  rename(which.table = selec.file) %>% 
+  # remove repetitive columns
+  select(-stfile, -inter)
+
+# save windows version
+write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+## code to change file paths for use on MAC
+allmatchedinter[,13] <- stringr::str_replace_all(allmatchedinter[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+sort(unique(allmatchedinter$Interval))
+
+## code to extract date from file names
+# mutate(dy2md = gsub("1342218252.", "", stfile), dy2md = substr(dy2md,1,nchar(dy2md)-10))
+
+# earlier check that the inter assignments hadn't changed
+# # oldinter <- read_xlsx("files_to_evaluate_boat_061920.xlsx", sheet = "files_to_evaluate_boat_061920") %>%  
+# oldinter <- read_xlsx("wdata/files_to_evaluate_boat.xlsx", sheet = "files_to_evaluate_boat") %>%    
+#   select(oldinter = inter, stfile = stfile.boat) %>% 
+#   select(-stfile) %>% distinct()
+# oldinter
+# newinter <- newinter %>% select(-stfile) %>% distinct()
 # matchedinter <- left_join(newinter, oldinter)
 # unique(matchedinter$oldinter)
 # # stephdid <- c(29, 91, 105, 113, 117,125)
 # matchedinter <- filter(matchedinter, oldinter %in% stephdid) 
 # matchedinter[is.odd(matchedinter$newinter),]
-# 
-# code to change file paths for mac
-bp<-imp_raven(path = here("w.selection.tables"),
-  files = "boat_passage_prelim.txt",
-  all.data = TRUE) 
-# colnames(bp)<-c("selection","view","channel","begin.time","end.time","low.freq","peak.freq","high.freq","delta.freq","delta.power","delta.time","file.off","begin.path","begin.file","class","sound.type","int","prd","comments")
-# bp <- stringr::str_replace_all(bp, "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
-# mutate(dymd = gsub("1342218252.", "", begin.file), dymd = substr(dymd,1,nchar(dymd)-10), stfile = begin.file)
-bp[,13] <- stringr::str_replace_all(bp[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")  
-write.table(bp, file = "boat_passage_prelim_mac.txt", sep = "\t",
-  row.names = FALSE) 
-
-bp[21]<- bp[14]
-colnames(bp)[21] <- "stfile"
-
-matchedinter <- left_join(bp, newinter)
-
-write.table(matchedinter, file = "boat_passage_prelim_w_newinter.txt", sep = "\t",
-  row.names = FALSE) 
-
-sort(unique(matchedinter$inter))
