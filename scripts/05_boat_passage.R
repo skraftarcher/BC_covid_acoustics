@@ -719,53 +719,48 @@ write.csv(all20, "wdata/files_list_for_2020.csv")
 # }
 
 
-# Code to match with old "inter"
+# Code to match old and new "inter" from selection tables? ----
 
-# oldinter <- read_xlsx("files_to_evaluate_boat_061920.xlsx", sheet = "files_to_evaluate_boat_061920") %>%  
-oldinter <- read_xlsx("wdata/files_to_evaluate_boat.xlsx", sheet = "files_to_evaluate_boat") %>%    
-  select(oldinter = inter, stfile = stfile.boat) %>% 
-  mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
-  select(-stfile) %>% distinct()
+# # oldinter <- read_xlsx("files_to_evaluate_boat_061920.xlsx", sheet = "files_to_evaluate_boat_061920") %>%  
+# oldinter <- read_xlsx("wdata/files_to_evaluate_boat.xlsx", sheet = "files_to_evaluate_boat") %>%    
+#   select(oldinter = inter, stfile = stfile.boat) %>% 
+#   # mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
+#   select(-stfile) %>% distinct()
+# oldinter
 
-oldinter
+newinter <- filter(allfiles2, type== "boat" ) %>% select(inter, stfile) %>% 
+  group_by(inter, stfile) %>%
+  # mutate(#dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10))
+  # select(-stfile) %>% 
+  distinct()
 
-
-newinter <- allfiles2 %>% select(inter, stfile) %>% 
-  mutate(dymd = gsub("1342218252.", "", stfile), dymd = substr(dymd,1,nchar(dymd)-10)) %>%
-  select(-stfile) %>% distinct()
-
+# remove morning passages since they weren't in first set of selections
+is.odd <- function(v) v %% 2 != 0
 newinter <- newinter[is.odd(newinter$inter),]
 
 # matchedinter <- left_join(newinter, oldinter)
-# 
 # unique(matchedinter$oldinter)
-# 
 # # stephdid <- c(29, 91, 105, 113, 117,125)
-# 
 # matchedinter <- filter(matchedinter, oldinter %in% stephdid) 
-# 
-# is.odd <- function(v) v %% 2 != 0
-# 
 # matchedinter[is.odd(matchedinter$newinter),]
 # 
-
 # code to change file paths for mac
-# #load data ----
-# bp<-imp_raven(path = here("w.selection.tables"),
-#   files = "boat_passage_prelim.txt",
-#   all.data = TRUE)
+bp<-imp_raven(path = here("w.selection.tables"),
+  files = "boat_passage_prelim.txt",
+  all.data = TRUE) 
 # colnames(bp)<-c("selection","view","channel","begin.time","end.time","low.freq","peak.freq","high.freq","delta.freq","delta.power","delta.time","file.off","begin.path","begin.file","class","sound.type","int","prd","comments")
-# 
-# bp$begin.path <- stringr::str_replace_all(bp, "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
-# 
-# write_csv(bp, "boat_passage_prelim_mac.csv")
+# bp <- stringr::str_replace_all(bp, "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+# mutate(dymd = gsub("1342218252.", "", begin.file), dymd = substr(dymd,1,nchar(dymd)-10), stfile = begin.file)
+bp[,13] <- stringr::str_replace_all(bp[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")  
+write.table(bp, file = "boat_passage_prelim_mac.txt", sep = "\t",
+  row.names = FALSE) 
 
-stephs_boat_pass <- read_csv("w.selection.tables/boat_passage_prelim_mac.csv") %>%  
-  mutate(dymd = gsub("1342218252.", "", begin.file), dymd = substr(dymd,1,nchar(dymd)-10)) 
+bp[21]<- bp[14]
+colnames(bp)[21] <- "stfile"
 
+matchedinter <- left_join(bp, newinter)
 
-matchedinter <- left_join(stephs_boat_pass, newinter)
+write.table(matchedinter, file = "boat_passage_prelim_w_newinter.txt", sep = "\t",
+  row.names = FALSE) 
 
-
-
-
+sort(unique(matchedinter$inter))
