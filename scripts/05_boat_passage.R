@@ -759,6 +759,7 @@ allmatchedinter <- bind_rows(matchedinter, matchedinter2) %>%
 
 # correct common typos
 allmatchedinter[16] <- case_when(
+  allmatchedinter[16]=="unkn"~"unkn",
   allmatchedinter[16]=="knock"~"knock",
   allmatchedinter[16]=="KNOCK"~"knock",
   allmatchedinter[16]=="grunt"~"grunt",
