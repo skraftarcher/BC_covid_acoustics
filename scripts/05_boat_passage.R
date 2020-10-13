@@ -730,7 +730,7 @@ is.odd <- function(v) v %% 2 != 0
 newinter <- newinter[is.odd(newinter$inter),]
 
 # load first selection table created (bp1)
-bp1<-imp_raven(path = here("w.selection.tables"),
+bp1 <- Rraven::imp_raven(path = here("w.selection.tables"),
   # files = "boat_passage_prelim.txt",
   files = "boat_passage_old.txt",
   all.data = TRUE) 
@@ -742,7 +742,7 @@ colnames(bp1)[21] <- "stfile"
 matchedinter <- left_join(bp1, newinter) %>% filter(!is.na(inter)) 
 
 # get selections from second selection table (bp2)
-bp2<-imp_raven(path = here("w.selection.tables"), files = "boat_passage_2nd.txt", all.data = TRUE) 
+bp2 <- Rraven::imp_raven(path = here("w.selection.tables"), files = "boat_passage_2nd.txt", all.data = TRUE) 
 bp2[21]<- bp2[14]
 colnames(bp2)[21] <- "stfile"
 
@@ -783,7 +783,7 @@ sort(unique(allmatchedinter$Interval))
 mydir = paste0(here::here("/selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
 myfiles <- list.files(path = mydir, pattern = "*.txt", full.names = F)
 myfiles
-allautoselect <- do.call(rbind, lapply(myfiles, imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
+allautoselect <- do.call(rbind, lapply(myfiles,  Rraven::imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
 glimpse(allautoselect)
 
 # rewrite path to work on MAC
@@ -796,6 +796,10 @@ orderautoselect <- allautoselect %>% arrange(selec.file, `File Offset (s)`) %>%
 
 # save .txt
 write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# subset to only fish sounds
+orderautoselect <- orderautoselect %>% filter(Class == "FS")
+write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoFS_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
 # confirm that files are exactly the same as for manual selection workspace 
 all19_2 <- filter(allfiles2, Year == "2019")
