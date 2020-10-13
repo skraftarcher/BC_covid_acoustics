@@ -780,7 +780,7 @@ sort(unique(allmatchedinter$Interval))
 ### prelim auto selections
 
 # extract from folder sent by X
-mydir = paste0(here::here("/w.selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
+mydir = paste0(here::here("/selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
 myfiles <- list.files(path = mydir, pattern = "*.txt", full.names = F)
 myfiles
 allautoselect <- do.call(rbind, lapply(myfiles, imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
