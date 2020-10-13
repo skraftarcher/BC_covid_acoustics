@@ -1,4 +1,8 @@
 # Data files
+/odata/
+/wdata/
+/selection.tables/
+/w.selection.tables/
 *.xls
 *.csv
 *.rds
@@ -8,6 +12,10 @@
 *.jpg
 *.jpeg
 *.tiff
+*.zip
+# Docs
+*.doc
+*.docx
 # History files
 .Rhistory
 .Rapp.history
@@ -33,7 +41,6 @@ scripts/*.html
 # knitr and R markdown default cache directories
 *_cache/
 /cache/
-/selection.tables/
 # Temporary files created by R markdown
 *.utf8.md
 *.knit.md
