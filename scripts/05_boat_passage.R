@@ -769,11 +769,48 @@ allmatchedinter[16] <- case_when(
 # save windows version
 write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
-## code to change file paths for use on MAC
+## code to change file paths for use on MAC ----
+
+### prelim manual selections
 allmatchedinter[,13] <- stringr::str_replace_all(allmatchedinter[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
 write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
 sort(unique(allmatchedinter$Interval))
+
+### prelim auto selections
+
+# extract from folder sent by X
+mydir = paste0(here::here("/w.selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
+myfiles <- list.files(path = mydir, pattern = "*.txt", full.names = F)
+myfiles
+allautoselect <- do.call(rbind, lapply(myfiles, imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
+glimpse(allautoselect)
+
+# rewrite path to work on MAC
+allautoselect[,9] <- stringr::str_replace_all(allautoselect[,9], "1342218252\\\\", 
+  "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+
+# renumber selections to load in a way consistent with manual selection workspace and period start times
+orderautoselect <- allautoselect %>% arrange(selec.file, `File Offset (s)`) %>% 
+  mutate(Selection_X = Selection, Selection = row_number()) 
+
+# save .txt
+write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# confirm that files are exactly the same as for manual selection workspace 
+all19_2 <- filter(allfiles2, Year == "2019")
+myfilelist <- unique(as.character(all19_2$stfile))
+
+# allautoFS <- filter(allautoselect, Class == "FS")
+Xfiles <- allautoFS$selec.file
+Xfilelist <- unique(gsub(".chan1.Table.1.selections.txt", "", Xfiles))
+
+# if returns character(0) than lists match exactly
+setdiff(myfilelist, Xfilelist)
+
+# Xfilelist[! Xfilelist %in% myfilelist]
+# myfilelist[! myfilelist %in% Xfilelist]
+
 
 ## code to extract date from file names
 # mutate(dy2md = gsub("1342218252.", "", stfile), dy2md = substr(dy2md,1,nchar(dy2md)-10))
