@@ -168,7 +168,7 @@ summary(Model5C)
 
 Model7<-lmer(SPL_Fish~WindSp+log10(MinDistMoving+1)+log10(MinDistAnchored+1)+AveSpeedMoving+log10(MinDistMoving+1):AveSpeedMoving+Recorder*Year+(1|Jday),data=Data_reduced)
 summary(Model7)
-Linear mixed model fit by REML. t-tests use Satterthwaite's method ['lmerModLmerTest']
+# Linear mixed model fit by REML. t-tests use Satterthwaite's method ['lmerModLmerTest']
 # Formula: SPL_Fish ~ WindSp + log10(MinDistMoving + 1) + log10(MinDistAnchored +  
 #     1) + AveSpeedMoving + log10(MinDistMoving + 1):AveSpeedMoving +      Recorder * Year + (1 | Jday)
 #    Data: Data_reduced
