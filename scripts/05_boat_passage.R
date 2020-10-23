@@ -787,15 +787,17 @@ allautoselect <- do.call(rbind, lapply(myfiles,  Rraven::imp_raven, path = mydir
 glimpse(allautoselect)
 
 # rewrite path to work on MAC
-allautoselect[,9] <- stringr::str_replace_all(allautoselect[,9], "1342218252\\\\", 
-  "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
-
+#allautoselect[,9] <- stringr::str_replace_all(allautoselect[,9], "1342218252\\\\", 
+#  "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+# rewrite path to work on PC
+# allautoselect[,9] <- paste0("E:/RCA_IN/April_July2019/1342218252/",allautoselect[,9])
 # renumber selections to load in a way consistent with manual selection workspace and period start times
 orderautoselect <- allautoselect %>% arrange(selec.file, `File Offset (s)`) %>% 
   mutate(Selection_X = Selection, Selection = row_number()) 
 
 # save .txt
-write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+#write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
 # subset to only fish sounds
 orderautoselect <- orderautoselect %>% filter(Class == "FS")
