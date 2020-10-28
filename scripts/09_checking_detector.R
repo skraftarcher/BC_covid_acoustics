@@ -154,5 +154,6 @@ temp3<-Rraven::imp_raven(path = here::here("w.selection.tables"),
                          all.data = TRUE) 
 r.select<-unique(p19.r$stfile)
 temp4<-temp3[temp3$`Begin File`%in% r.select,]
+temp4[,9]<-paste0("E:\\RCA_IN\\April_July2019\\amplified_10\\",temp4[,11])
 
 write.table(temp4, file = "w.selection.tables/boat_passage_random_selections_amp_10.txt", sep = "\t", row.names = FALSE, quote = FALSE)
