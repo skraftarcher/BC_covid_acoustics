@@ -116,4 +116,43 @@ ggplot(data=all.summary,aes(y=agreement,x=p,fill=as.factor(amplification)))+
   geom_bar(stat="identity",position = position_dodge())+
   facet_grid(~Class)
 
+# for Steph- move files to amplify
+ftm<-unique(temp1$`Begin File`)
+for (i in 1:length(ftm)){
+   filesstrings::file.move(paste0("E:/RCA_IN/April_July2019/1342218252/",ftm[i]),
+     "E:/RCA_IN/April_July2019/toamplify")}
 
+# Still for Steph- change filepath and update manual annotations to match 10db amplification.
+temp2<-temp1[!is.na(temp1[,21]),]
+temp3<-setdiff(temp1,temp2)
+temp3<-bind_rows(a10,temp3)
+temp3<-temp3[,1:22]
+temp3[,9]<-paste0("E:\\RCA_IN\\April_July2019\\amplified_10\\",temp3[,11])
+
+write.table(temp3, file = "w.selection.tables/boat_passage_use_amp_10.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# for Steph- select a random 10% of 5 minute periods in 2019 to manually evaluate.
+ 
+# p19<-readxl::read_xlsx(here::here("wdata","Archer_file_evaluations_master.xlsx"),sheet="files_to_evaluate_all")%>%
+#   filter(year==2019)
+# 
+# p19.r<-p19%>%
+#   select(inter,prd,strt,type)%>%
+#   distinct()%>%
+#   sample_frac(.1,replace=FALSE)%>%
+#   mutate(review="yes")%>%
+#   full_join(p19)%>%
+#   arrange(strt)
+
+# write.csv(p19.r,here::here("wdata","random_review.csv"))
+p19.r<-read.csv(here::here("wdata","random_review.csv"))%>%
+  filter(review=="yes")
+# make a sound selection table with only the needed files
+
+temp3<-Rraven::imp_raven(path = here::here("w.selection.tables"),
+                         files = "boat_passage_use_amp_10.txt",
+                         all.data = TRUE) 
+r.select<-unique(p19.r$stfile)
+temp4<-temp3[temp3$`Begin File`%in% r.select,]
+
+write.table(temp4, file = "w.selection.tables/boat_passage_random_selections_amp_10.txt", sep = "\t", row.names = FALSE, quote = FALSE)
