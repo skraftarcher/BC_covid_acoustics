@@ -141,7 +141,7 @@ write.table(temp3, file = "w.selection.tables/boat_passage_use_amp_10.txt", sep 
 # mess2<-mess[!is.na(mess[,21]),]%>%
 #   select(inter=Inter,prd=Period,stfile=`Begin File`)%>%
 #   distinct()
-#  
+# 
 # 
 # p19<-readxl::read_xlsx(here::here("wdata","Archer_file_evaluations_master.xlsx"),sheet="files_to_evaluate_all")[,-1]%>%
 #    filter(year==2019)
@@ -158,45 +158,68 @@ write.table(temp3, file = "w.selection.tables/boat_passage_use_amp_10.txt", sep 
 #   anti_join(mess2)
 # 
 # # select 10% of files by prd and type
-# p192r<-p192%>%
-#   group_by(prd,type)%>%
-#   sample_frac(.1,replace=FALSE)%>%
+p192r<-p192%>%
+  group_by(prd,type)%>%
+  sample_n(5,replace=FALSE)#%>%
 #   left_join(p19)
 # # I  have 1 of each type other than pre/boat (0) and post/boat (2) so make a dataset to get rid of one of those.
 # # first randomly select one quiet per prd so remove from the random selection above
-# p19q<-p192r%>%
-#   filter(type=="quiet")%>%
-#   group_by(prd)%>%
-#   sample_n(1,replace=FALSE)
-# # now select two post/boat to remove
-# p19pb<-p192r%>%
-#   filter(type=="boat")%>%
-#   filter(prd=="post")%>%
-#   sample_n(2,replace=FALSE)
-# # now select one ferry/boat to remove
-# p19fb<-p192r%>%
-#   filter(type=="boat")%>%
-#   filter(prd=="ferry")%>%
-#   sample_n(1,replace=FALSE)
+p19q<-p192r%>%
+  filter(type=="quiet")%>%
+  group_by(prd)%>%
+  sample_n(1,replace=FALSE)
+# now select two post/boat to remove
+p19pb<-p192r%>%
+  filter(type=="boat")%>%
+  filter(prd=="post")%>%
+  sample_n(2,replace=FALSE)
+# now select one ferry/boat to remove
+p19fb<-p192r%>%
+  filter(type=="boat")%>%
+  filter(prd=="ferry")%>%
+  sample_n(1,replace=FALSE)
 # # now create a dataset that is all the files to review
-# p19.r<-p192r%>%
-#   anti_join(p19q)%>%
-#   anti_join(p19pb)%>%
-#   anti_join(p19fb)
-# 
-# # add in the files from my first attempt
-# p19old<-p19%>%
-#   semi_join(mess2)
-# p19.r<-bind_rows(p19old,p19.r)
-# write.csv(p19.r,here::here("wdata","random_review_Nov32020.csv"))
+
+p19.r<-p192r%>%
+  anti_join(p19q)%>%
+  anti_join(p19pb)%>%
+  anti_join(p19fb)%>%
+  bind_rows(mess2)%>%
+  select(inter,prd,type)%>%
+  distinct()%>%
+  left_join(p19)
+
+#write.csv(p19.r,here::here("wdata","random_review_Nov32020.csv"))
 p19.r<-read.csv(here::here("wdata","random_review_Nov32020.csv"))
 # make a sound selection table with only the needed files
 
 temp3<-Rraven::imp_raven(path = here::here("w.selection.tables"),
-                         files = "boat_passage_use_amp_10.txt",
+                         files = "boat_passage_random_selections_amp_10.txt",
                          all.data = TRUE) 
-r.select<-unique(p19.r$stfile)
-temp4<-temp3[temp3$`Begin File`%in% r.select,]
-temp4[,9]<-paste0("E:\\RCA_IN\\April_July2019\\amplified_10\\",temp4[,11])
+temp3<-temp3[,-23:-24]
 
-write.table(temp4, file = "w.selection.tables/boat_passage_random_selections_amp_10_Nov32020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+temp3b<-Rraven::imp_raven(path = here::here("w.selection.tables"),
+                         files = "boat_passage_use_amp_10.txt",
+                         all.data = TRUE)
+temp3b<-temp3b[,-23]
+
+temp3c<-temp3[temp3$Inter %in% c(21,30,31,32,38,72),]
+temp3c<-unique(temp3c$`Begin File`)
+
+temp4<-temp3b%>%
+  filter(!`Begin File` %in% temp3c)%>% 
+  bind_rows(temp3)%>%
+  arrange(`Begin File`,`File Offset (s)`)%>%
+  mutate(Selection = row_number())
+
+
+
+r.select<-p19.r%>%
+  ungroup()%>%
+  arrange(stfile)%>%
+  select(stfile)%>%
+  distinct()
+temp5<-temp4[temp4$`Begin File`%in% r.select$stfile,]
+temp5[,9]<-paste0("E:\\RCA_IN\\April_July2019\\amplified_10\\",temp5[,11])
+
+write.table(temp5, file = "w.selection.tables/boat_passage_random_selections_amp_10_Nov32020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
