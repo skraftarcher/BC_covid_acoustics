@@ -777,45 +777,52 @@ write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_upda
 
 sort(unique(allmatchedinter$Interval))
 
+### EDITING SELECTION TABLES
 ### prelim auto selections
 
-# extract from folder sent by X
-mydir = paste0(here::here("/selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
-myfiles <- list.files(path = mydir, pattern = "*.txt", full.names = F)
-myfiles
-allautoselect <- do.call(rbind, lapply(myfiles,  Rraven::imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
-glimpse(allautoselect)
-
-# rewrite path to work on MAC
-#allautoselect[,9] <- stringr::str_replace_all(allautoselect[,9], "1342218252\\\\", 
+# # extract from folder sent by X
+# 
+# mydir = paste0(here::here("/selection.tables/Raven_files_RCA_in_April_July2019_1342218252/"))
+# myfiles <- list.files(path = mydir, pattern = "*.txt", full.names = F)
+# myfiles
+# allautoselect <- do.call(rbind, lapply(myfiles,  Rraven::imp_raven, path = mydir, warbler.format = FALSE, all.data = TRUE) )
+# glimpse(allautoselect)
+# 
+# # Stephs selection table
+# allautoselect <- Rraven::imp_raven(path = here::here("selection.tables"),
+#   files = "boat_passage_random_selections_amp_10_Nov32020.txt",
+#   all.data = TRUE) 
+# 
+# # rewrite path to work on MAC
+# allautoselect[,9] <- stringr::str_replace_all(allautoselect[,9], "1342218252\\\\",
 #  "/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
-# rewrite path to work on PC
-# allautoselect[,9] <- paste0("E:/RCA_IN/April_July2019/1342218252/",allautoselect[,9])
-# renumber selections to load in a way consistent with manual selection workspace and period start times
-orderautoselect <- allautoselect %>% arrange(selec.file, `File Offset (s)`) %>% 
-  mutate(Selection_X = Selection, Selection = row_number()) 
-
-# save .txt
-#write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-
-# subset to only fish sounds
-orderautoselect <- orderautoselect %>% filter(Class == "FS")
-write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoFS_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-
-# confirm that files are exactly the same as for manual selection workspace 
-all19_2 <- filter(allfiles2, Year == "2019")
-myfilelist <- unique(as.character(all19_2$stfile))
-
-# allautoFS <- filter(allautoselect, Class == "FS")
-Xfiles <- allautoFS$selec.file
-Xfilelist <- unique(gsub(".chan1.Table.1.selections.txt", "", Xfiles))
-
-# if returns character(0) than lists match exactly
-setdiff(myfilelist, Xfilelist)
-
-# Xfilelist[! Xfilelist %in% myfilelist]
-# myfilelist[! myfilelist %in% Xfilelist]
+# # # rewrite path to work on PC
+# # allautoselect[,9] <- paste0("E:/RCA_IN/April_July2019/1342218252/",allautoselect[,9])
+# # renumber selections to load in a way consistent with manual selection workspace and period start times
+# orderautoselect <- allautoselect %>% arrange(selec.file, `File Offset (s)`) %>% 
+#   mutate(Selection_X = Selection, Selection = row_number()) 
+# 
+# # save .txt
+# #write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+# write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoselect_Nov3.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+# 
+# # subset to only fish sounds
+# orderautoselect <- orderautoselect %>% filter(Class == "FS")
+# write.table(orderautoselect, file = "w.selection.tables/boat_passage_autoFS_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+# 
+# # confirm that files are exactly the same as for manual selection workspace 
+# all19_2 <- filter(allfiles2, Year == "2019")
+# myfilelist <- unique(as.character(all19_2$stfile))
+# 
+# # allautoFS <- filter(allautoselect, Class == "FS")
+# Xfiles <- allautoFS$selec.file
+# Xfilelist <- unique(gsub(".chan1.Table.1.selections.txt", "", Xfiles))
+# 
+# # if returns character(0) than lists match exactly
+# setdiff(myfilelist, Xfilelist)
+# 
+# # Xfilelist[! Xfilelist %in% myfilelist]
+# # myfilelist[! myfilelist %in% Xfilelist]
 
 
 ## code to extract date from file names
