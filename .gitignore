@@ -8,6 +8,7 @@
 *.rds
 # *.txt
 # figures
+*.pdf
 *.png
 *.jpg
 *.jpeg
