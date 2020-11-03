@@ -135,23 +135,23 @@ write.table(temp3, file = "w.selection.tables/boat_passage_use_amp_10.txt", sep 
 
 # check to make sure which 5 minute periods I've done that actually line up.
 
-mess<-Rraven::imp_raven(path = here::here("w.selection.tables"),
-                        files = "boat_passage_random_selections_amp_10.txt",
-                        all.data = TRUE)
-mess2<-mess[!is.na(mess[,21]),]%>%
-  select(inter=Inter,prd=Period,stfile=`Begin File`)%>%
-  distinct()
- 
-
-p19<-readxl::read_xlsx(here::here("wdata","Archer_file_evaluations_master.xlsx"),sheet="files_to_evaluate_all")[,-1]%>%
-   filter(year==2019)
-mess2<-mess2%>%
-  left_join(p19)%>%
-  filter(!is.na(into.file))%>%
-  select(inter,prd,type)
-table(mess2$prd,mess2$type)
-
-# create a dataset that is unique inter, prd, type that aren't the ones I can keep from my first attempt at this.
+# mess<-Rraven::imp_raven(path = here::here("w.selection.tables"),
+#                         files = "boat_passage_random_selections_amp_10.txt",
+#                         all.data = TRUE)
+# mess2<-mess[!is.na(mess[,21]),]%>%
+#   select(inter=Inter,prd=Period,stfile=`Begin File`)%>%
+#   distinct()
+#  
+# 
+# p19<-readxl::read_xlsx(here::here("wdata","Archer_file_evaluations_master.xlsx"),sheet="files_to_evaluate_all")[,-1]%>%
+#    filter(year==2019)
+# mess2<-mess2%>%
+#   left_join(p19)%>%
+#   filter(!is.na(into.file))%>%
+#   select(inter,prd,type)
+# table(mess2$prd,mess2$type)
+# 
+# #create a dataset that is unique inter, prd, type that aren't the ones I can keep from my first attempt at this.
 # p192<-p19%>%
 #   select(inter,prd,type)%>%
 #   distinct()%>%
@@ -162,7 +162,7 @@ table(mess2$prd,mess2$type)
 #   group_by(prd,type)%>%
 #   sample_frac(.1,replace=FALSE)%>%
 #   left_join(p19)
-# # I  have 1 of each type other than pre/boat (0) and post/boat (2) so make a dataset to get rid of one of those. 
+# # I  have 1 of each type other than pre/boat (0) and post/boat (2) so make a dataset to get rid of one of those.
 # # first randomly select one quiet per prd so remove from the random selection above
 # p19q<-p192r%>%
 #   filter(type=="quiet")%>%
@@ -188,7 +188,7 @@ table(mess2$prd,mess2$type)
 # p19old<-p19%>%
 #   semi_join(mess2)
 # p19.r<-bind_rows(p19old,p19.r)
-# write.csv(p192r,here::here("wdata","random_review_Nov32020.csv"))
+# write.csv(p19.r,here::here("wdata","random_review_Nov32020.csv"))
 p19.r<-read.csv(here::here("wdata","random_review_Nov32020.csv"))
 # make a sound selection table with only the needed files
 
