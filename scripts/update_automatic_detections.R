@@ -1,6 +1,7 @@
 # script to update automatic detection classifications
 
 #bring in Xavier's selection tables
+library(tidyverse)
 
 #only have to run this bit once. If running a second time you can start on line 18
 temp1<-list.files("selection.tables/RCA_in_April_July2019_1342218252_updated/", pattern = "*.txt")
@@ -26,13 +27,32 @@ check19<-Rraven::imp_raven(path = here::here("w.selection.tables"),
                            files = "boat_passage_random_selections_amp_10_Nov32020.txt",
                            all.data = TRUE) 
 
+check.file<-unique((check19$`Begin File`))
+
+
 # going to match new classifications by file offset and begin file
 
-new.files2<-new.files%>%
-  select("File Offset (s)",`Delta Time (s)`,"Begin File",updated.class=Class,updated.confidence=Confidence)
+new.files2<-new.files[new.files[,9]%in%check.file,-16:-17]%>%
+  select(`Begin File`,
+         `File Offset (s)`,
+         `Delta Time (s)`,
+         `High Freq (Hz)`,
+         updated.class=Class,
+         updated.confidence=Confidence)%>%
+  mutate(dtime=round(`Delta Time (s)`,2),
+         fstime=round(`File Offset (s)`,2),
+         hzs=round(`High Freq (Hz)`,3))%>%
+  select(-`Delta Time (s)`,-`File Offset (s)`,-`High Freq (Hz)`)%>%
+  distinct()
 
-updated19<-left_join(check19,new.files2)
+check19<-check19%>%
+  mutate(dtime=round(`Delta Time (s)`,2),
+         fstime=round(`File Offset (s)`,2),
+         hzs=round(`High Freq (Hz)`,3))
+  
+updated19<-left_join(check19,new.files2)%>%
+  select(-dtime,-fstime,-hzs)
 
-write.table(updated19,file="w.selection.tables/boat_passage_random_selections_updated_Dec152020.txt")
+write.table(updated19,file="w.selection.tables/boat_passage_random_selections_updated_Dec152020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
 

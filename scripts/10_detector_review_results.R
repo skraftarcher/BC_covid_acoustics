@@ -5,34 +5,34 @@ library(lubridate)
 # bring in selection table
 
 check19<-Rraven::imp_raven(path = here::here("w.selection.tables"),
-                           files = "boat_passage_random_selections_amp_10_Nov32020.txt",
+                           files = "boat_passage_random_selections_updated_Dec152020.txt",
                            all.data = TRUE) 
 
 colnames(check19)<-c("Selection","View","Channel","begin.time","end.time","delta.time","low.freq","high.freq","begin.path","file.offset",
                      "begin.file","class","sound.type","software","confidence","selec.file1","selection_x","m.class","m.type","coments",
-                     "inter","prd","selec.file")
+                     "inter","prd","selec.file","updated.class","updated.confidence","selec.file2")
 # create an agreement variable
 
 check192<-check19[!is.na(check19$inter),] %>%
   mutate(agrmt = case_when(
-    class=="NN"& m.class=="N"~"agree.noise",
-    class=="NN" & m.class=="NH"~"noise.not.heard",
-    class=="NN" & m.class=="F"~"false.negative",
-    class=="NN" & m.class=="U"~"uncertain",
-    class=="NN" & is.na(m.class)~"not.annotated",
-    class=="NN" & m.class=="FS"~"split.detection",
-    class=="FS"& m.class=="N"~"false.positive",
-    class=="FS" & m.class=="NH"~"fish.not.heard",
-    class=="FS" & m.class=="F"~"agree.fish",
-    class=="FS" & m.class=="U"~"uncertain",
-    class=="FS" & is.na(m.class)~"not.annotated",
-    class=="FS" & m.class=="FS"~"split.detection",
-    is.na(class)& m.class=="N"~"new.noise",
-    is.na(class) & m.class=="NH"~"mistake",
-    is.na(class) & m.class=="F"~"new.fish",
-    is.na(class) & m.class=="U"~"new.uncertain",
-    is.na(class) & is.na(m.class)~"not.annotated",
-    is.na(class) & m.class=="FS"~"split.detection"))
+    updated.class=="NN"& m.class=="N"~"agree.noise",
+    updated.class=="NN" & m.class=="NH"~"noise.not.heard",
+    updated.class=="NN" & m.class=="F"~"false.negative",
+    updated.class=="NN" & m.class=="U"~"uncertain",
+    updated.class=="NN" & is.na(m.class)~"not.annotated",
+    updated.class=="NN" & m.class=="FS"~"split.detection",
+    updated.class=="FS"& m.class=="N"~"false.positive",
+    updated.class=="FS" & m.class=="NH"~"fish.not.heard",
+    updated.class=="FS" & m.class=="F"~"agree.fish",
+    updated.class=="FS" & m.class=="U"~"uncertain",
+    updated.class=="FS" & is.na(m.class)~"not.annotated",
+    updated.class=="FS" & m.class=="FS"~"split.detection",
+    is.na(updated.class)& m.class=="N"~"new.noise",
+    is.na(updated.class) & m.class=="NH"~"mistake",
+    is.na(updated.class) & m.class=="F"~"new.fish",
+    is.na(updated.class) & m.class=="U"~"new.uncertain",
+    is.na(updated.class) & is.na(m.class)~"not.annotated",
+    is.na(updated.class) & m.class=="FS"~"split.detection"))
 
 check192<-separate(check192,begin.file,into = c("st","yr","m","d","hr","min","s","ext"),sep = c(11,13,15,17,19,21,23),remove=FALSE)
 
@@ -102,3 +102,51 @@ prcts<-check192%>%
   mutate(p.detect=ndetect/totdetect)
 
 
+# look at patterns of calls in 5 minute periods in automatic detector vs manual
+
+auto19<-check192%>%
+  group_by(inter, prd, class)%>%
+  summarize(ncall.auto=n(),spl=mean(SPL))%>%
+  filter(class=="FS")%>%
+  select(-class)
+
+man19<-check192%>%
+  group_by(inter, prd, m.class)%>%
+  summarize(ncall.man=n())%>%
+  filter(m.class=="F")%>%
+  select(-m.class)
+
+all19<-left_join(auto19,man19)
+summary(lm(ncall.man~ncall.auto,data=all19))
+
+ggplot(aes(x=ncall.auto,y=ncall.man),data=all19)+
+  geom_point(aes(color=spl))+
+  geom_smooth(method="lm")+
+  geom_text(aes(x=25,y=185),label="R2 = 0.49")
+
+ggsave("figures/auto_mannual.jpg")
+
+# look at spl by minute
+
+auto192<-check192%>%
+  group_by(interval, class, SPL)%>%
+  summarize(ncall.auto=n())%>%
+  filter(class=="FS")%>%
+  select(-class)
+
+man192<-check192%>%
+  group_by(interval, m.class)%>%
+  summarize(ncall.man=n())%>%
+  filter(m.class=="F")%>%
+  select(-m.class)
+
+all192<-left_join(auto192,man192)%>%
+  mutate(ncall.man=ifelse(is.na(ncall.man),0,ncall.man))
+summary(lm(ncall.man~ncall.auto,data=all192))
+
+ggplot(aes(x=ncall.auto,y=ncall.man),data=all192)+
+  geom_point(aes(color=SPL))+
+  geom_smooth(method="lm")+
+  geom_text(aes(x=25,y=50),label="R2 = 0.62")
+
+ggsave("figures/auto_mannual_by_minute.jpg")
