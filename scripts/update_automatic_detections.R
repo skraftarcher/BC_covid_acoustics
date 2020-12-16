@@ -50,9 +50,27 @@ check19<-check19%>%
          fstime=round(`File Offset (s)`,2),
          hzs=round(`High Freq (Hz)`,3))
   
-updated19<-left_join(check19,new.files2)%>%
+u19<-left_join(check19,new.files2)%>%
   select(-dtime,-fstime,-hzs)
 
-write.table(updated19,file="w.selection.tables/boat_passage_random_selections_updated_Dec152020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+write.table(u19,file="w.selection.tables/boat_passage_random_selections_updated_Dec152020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 
+# forgot to update file path
+
+u19<-Rraven::imp_raven(path = here::here("w.selection.tables"),
+                           files = "boat_passage_random_selections_updated_Dec152020.txt",
+                           all.data = TRUE) 
+
+u19[,9] <- paste0("D:/RCA_IN/April_July2019/amplified_10/",u19[,9])
+u19<-u19[,-26:-27]
+write.table(u19,file="w.selection.tables/boat_passage_random_selections_updated_Dec152020.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# I'm not convinced by my matching. So I'm going to make a dataset of his new classifications that
+# only includes the files that I'm doing my checking on. Then to check the
+# correlation between manual and automatic I will look at the # of calls per 
+# minute in each dataset.
+
+new.files3<-new.files[new.files[,9]%in%check.file,-16:-17]
+
+write.table(new.files3,file="w.selection.tables/USE_THIS_FOR_CHECKING_AUTODETECTOR.txt", sep = "\t", row.names = FALSE, quote = FALSE)
 

@@ -105,10 +105,10 @@ prcts<-check192%>%
 # look at patterns of calls in 5 minute periods in automatic detector vs manual
 
 auto19<-check192%>%
-  group_by(inter, prd, class)%>%
+  group_by(inter, prd, updated.class)%>%
   summarize(ncall.auto=n(),spl=mean(SPL))%>%
-  filter(class=="FS")%>%
-  select(-class)
+  filter(updated.class=="FS")%>%
+  select(-updated.class)
 
 man19<-check192%>%
   group_by(inter, prd, m.class)%>%
@@ -118,21 +118,22 @@ man19<-check192%>%
 
 all19<-left_join(auto19,man19)
 summary(lm(ncall.man~ncall.auto,data=all19))
+cor(x=all19$ncall.man,y=all19$ncall.auto,method="pearson")
 
 ggplot(aes(x=ncall.auto,y=ncall.man),data=all19)+
   geom_point(aes(color=spl))+
   geom_smooth(method="lm")+
-  geom_text(aes(x=25,y=185),label="R2 = 0.49")
+  geom_text(aes(x=20,y=150),label="rp = 0.88")
 
-ggsave("figures/auto_mannual.jpg")
+ggsave("figures/auto_mannual_updated.jpg")
 
 # look at spl by minute
 
 auto192<-check192%>%
-  group_by(interval, class, SPL)%>%
+  group_by(interval, updated.class, SPL)%>%
   summarize(ncall.auto=n())%>%
-  filter(class=="FS")%>%
-  select(-class)
+  filter(updated.class=="FS")%>%
+  select(-updated.class)
 
 man192<-check192%>%
   group_by(interval, m.class)%>%
@@ -142,11 +143,13 @@ man192<-check192%>%
 
 all192<-left_join(auto192,man192)%>%
   mutate(ncall.man=ifelse(is.na(ncall.man),0,ncall.man))
-summary(lm(ncall.man~ncall.auto,data=all192))
+cor(x=all192$ncall.man,y=all192$ncall.auto,method="pearson")
+
 
 ggplot(aes(x=ncall.auto,y=ncall.man),data=all192)+
   geom_point(aes(color=SPL))+
   geom_smooth(method="lm")+
-  geom_text(aes(x=25,y=50),label="R2 = 0.62")
+  geom_text(aes(x=5,y=50),label="rp = 0.86")
 
-ggsave("figures/auto_mannual_by_minute.jpg")
+
+ggsave("figures/auto_mannual_by_minute_updated.jpg")
