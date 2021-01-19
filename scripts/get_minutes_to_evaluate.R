@@ -16,7 +16,8 @@ ad2<-unique(already.done$interval)
 spl<-readRDS("wdata/spl_by_min.rds")
 
 year(spl$DateTime)<-spl$year
-spl<-arrange(spl,DateTime)
+spl<-arrange(spl,DateTime)%>%
+  filter(rca=="in")
 spl$dt2<-spl$DateTime+1
 spl$interval<-findInterval(spl$dt2,spl$DateTime)
 
@@ -50,20 +51,22 @@ spl2<-spl2 %>%
          SPL<=spl.quantiles[9] & SPL>spl.quantiles[8]~9,
          SPL>spl.quantiles[9]~10))
 # look at how many I've already done per "group"
-spl3<-spl2%>%
+(spl3<-spl2%>%
   group_by(spl.group)%>%
-  summarize(min.done=sum(already.done))
+  summarize(min.done=sum(already.done)))
 
-# Maximum I've already done is 77. Maybe do 80 per group?
-need.to.do<-80-spl3$min.done
+spl4<-spl%>%
+  select(interval,DateTime)%>%
+  distinct()
+
+# Do 25 per group
 mins.to.do_a<-spl2%>%
   filter(already.done!=1)
-for(i in 1:10){
-  t1<-filter(mins.to.do_a,spl.group==i)%>%
-    sample_n(need.to.do[i],replace=F)
-  if(i==1)mins.to.do<-t1
-  if(i!=1)mins.to.do<-bind_rows(mins.to.do,t1)
-}
+
+mins.to.do<-mins.to.do_a%>%
+  group_by(spl.group)%>%
+  sample_n(25,replace=FALSE)
+
 
 
 new.files2<-new.files%>%
@@ -77,6 +80,7 @@ new.files2<-separate(new.files2,begin.file,into = c("st","yr","m","d","hr","min"
 new.files2<- new.files2 %>%
   mutate(yr=paste0(20,yr),
          datetime=ymd_hms(paste(yr,m,d,hr,min,s)),
+         dt2=datetime,
          datetime=datetime+fo,
          yr=year(datetime),
          m=month(datetime),
@@ -91,10 +95,26 @@ new.files2$interval<-findInterval(new.files2$datetime,spl$DateTime)
 mins.to.do2<-new.files2 %>%
   filter(interval %in% mins.to.do$interval)%>%
   left_join(spl2)%>%
-  arrange(begin.file,fo)%>%
+  arrange(datetime)%>%
+  mutate(Selection_orig=Selection,
+         Selection=row_number())%>%
   select(Selection,View,Channel,"Begin Time (s)","End Time (s)",
          "Delta Time (s)", "Low Freq (Hz)" , "High Freq (Hz)",
-         "Begin Path",`File Offset (s)`=fo,"Begin File"=begin.file,Class,"Sound type",Confidence,interval,SPL,spl.group)
+         "Begin Path",`File Offset (s)`=fo,"Begin File"=begin.file,Class,"Sound type",Confidence,interval,SPL,spl.group,Selection_orig)
+
+
+ints.doing<-new.files2%>%
+  select(interval,begin.file,dt2)%>%
+  filter(interval %in% mins.to.do2$interval)%>%
+  distinct()
+for.pages<-spl4[spl4$interval%in%ints.doing$interval,]%>%
+  left_join(ints.doing)%>%
+  select(interval,begin.file,DateTime,dt2)%>%
+  mutate(sec.into.file=DateTime-dt2)
+write.csv(for.pages,"wdata/minutes_to_evaluate_master_sheet.csv")
+
+
+
 
 mins.to.do2$`Begin Path`<-paste0("D:/RCA_IN/April_July2019/amplified_10/",mins.to.do2$`Begin Path`)
 ftm<-mins.to.do2$`Begin File`[mins.to.do2$`Begin File`%in% list.files("D:/RCA_IN/April_July2019/1342218252/")]

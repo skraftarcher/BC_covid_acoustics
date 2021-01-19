@@ -34,7 +34,8 @@ mand19<-mand19%>%
 spl<-readRDS("wdata/spl_by_min.rds")
 
 year(spl$DateTime)<-spl$year
-spl<-arrange(spl,DateTime)
+spl<-arrange(spl,DateTime)%>%
+  filter(rca=="in")
 spl$dt2<-spl$DateTime+1
 spl$interval<-findInterval(spl$dt2,spl$DateTime)
 
@@ -99,7 +100,7 @@ call.min<-left_join(mand.min,autod.min)
 
 round(cor(x=call.min$n.man.call,y=call.min$n.auto.call),2)
 
-rplab<-expression(paste("r"[p]," = ",0.81))
+rplab<-expression(paste("r"[p]," = ",0.73))
 
 ggplot(data=call.min)+
   geom_point(aes(y=n.auto.call,x=n.man.call,color=SPL),size=3,position=position_dodge(0.9))+
@@ -148,7 +149,7 @@ call.min3<-call.min2%>%
 
 round(cor(x=call.min3$n.man.call,y=call.min3$n.auto.call),2)
 
-rplab<-expression(paste("r"["p"]," = 0.84"))
+rplab<-expression(paste("r"["p"]," = 0.8"))
 
 ggplot(data=call.min3)+
   geom_point(aes(y=n.auto.call,x=n.man.call,color=SPL),size=3,position=position_dodge(0.9))+
