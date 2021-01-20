@@ -6,7 +6,8 @@ if(!require(glmmTMB))install.packages("glmmTMB");library(glmmTMB)
 
 
 fishonly <- readRDS("wdata/auto_all_periods_fishonly.rds")
-inter_dates <- fishonly %>% select(inter, dt1)
+inter_dates <- fishonly %>% select(inter, dt1)%>%
+  distinct()
 
 
 d <- fishonly %>% filter(Confidence >= 0.50) %>% 
@@ -51,7 +52,8 @@ d2 <- filter(d, !(prd == "ferry" & type == "boat")) %>% mutate(
     prd == "post" & type == "boat" ~ "post-passage",
     type == "quiet" ~ "quiet"
   ), 
-  prd_type = factor(prd_type, levels = c("pre-passage", "post-passage", "quiet"))
+  prd_type = factor(prd_type, levels = c("pre-passage", "post-passage", "quiet")),
+  pm=ifelse(inter %in% seq(21,236,2),"pm","am")
 )
 
 ggplot(d2, aes(prd_type, fish_count)) +
@@ -81,9 +83,12 @@ mmod_simres <- simulateResiduals(mmod)
 testDispersion(mmod_simres) 
 plot(mmod_simres)
 
+# ggeffects plots
+library(ggeffects)
 
+p1 <- ggpredict(mmod, terms = c("prd", "type","year")) 
 
-
+plot(p1)
 
 lm1 <- lm(fish_count~prd_type, data = d2 )
 anova(aov1)
