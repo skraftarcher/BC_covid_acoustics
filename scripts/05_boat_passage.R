@@ -719,64 +719,67 @@ write.csv(all20, "wdata/files_list_for_2020.csv")
 # }
 
 
-# Code to extract retained and reliable "Intervals" from selection tables ----
+# Code to extract chosen "Intervals" from selection tables ----
 
-newinter <- filter(allfiles2, type== "boat" ) %>% select(inter, stfile) %>% 
-  group_by(inter, stfile) %>%
-  distinct()
+allfiles2 <- read.csv("wdata/files_to_evaluate_all.csv")
 
-# remove morning passages since they weren't in first set of selections
-is.odd <- function(v) v %% 2 != 0
-newinter <- newinter[is.odd(newinter$inter),]
-
-# load first selection table created (bp1)
-bp1 <- Rraven::imp_raven(path = here("w.selection.tables"),
-  # files = "boat_passage_prelim.txt",
-  files = "boat_passage_old.txt",
-  all.data = TRUE) 
-
-bp1[21]<- bp1[14]
-colnames(bp1)[21] <- "stfile"
-
-# remove intervals not to be used anymore
-matchedinter <- left_join(bp1, newinter) %>% filter(!is.na(inter)) 
-
-# get selections from second selection table (bp2)
-bp2 <- Rraven::imp_raven(path = here("w.selection.tables"), files = "boat_passage_2nd.txt", all.data = TRUE) 
-bp2[21]<- bp2[14]
-colnames(bp2)[21] <- "stfile"
-
-# filter out intervals already present in bp1
-oldinters <- unique(matchedinter$inter)
-matchedinter2 <- left_join(bp2, newinter) %>% filter(!(Interval %in% oldinters) & !is.na(inter)) 
-
-# combine all selections 
-allmatchedinter <- bind_rows(matchedinter, matchedinter2) %>% 
-  # name column indicating which selection table row comes from
-  rename(which.table = selec.file) %>% 
-  # remove repetitive columns
-  select(-stfile, -inter)
-
-# correct common typos
-allmatchedinter[16] <- case_when(
-  allmatchedinter[16]=="unkn"~"unkn",
-  allmatchedinter[16]=="knock"~"knock",
-  allmatchedinter[16]=="KNOCK"~"knock",
-  allmatchedinter[16]=="grunt"~"grunt",
-  allmatchedinter[16]=="grutn"~"grunt",
-  allmatchedinter[16]=="grrunt"~"grunt")
-
-# save windows version
-write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-
-## code to change file paths for use on MAC ----
-
-### prelim manual selections
-allmatchedinter[,13] <- stringr::str_replace_all(allmatchedinter[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
-write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-
-sort(unique(allmatchedinter$Interval))
-
+# # code for use with old manual selection tables ?
+# newinter <- filter(allfiles2, type== "boat" ) %>% select(inter, stfile) %>%
+#   group_by(inter, stfile) %>%
+#   distinct()
+# 
+# # remove morning passages since they weren't in first set of selections
+# is.odd <- function(v) v %% 2 != 0
+# newinter <- newinter[is.odd(newinter$inter),]
+# 
+# # load first selection table created (bp1)
+# bp1 <- Rraven::imp_raven(path = here("w.selection.tables"),
+#   # files = "boat_passage_prelim.txt",
+#   files = "boat_passage_old.txt",
+#   all.data = TRUE) 
+# 
+# bp1[21]<- bp1[14]
+# colnames(bp1)[21] <- "stfile"
+# 
+# # remove intervals not to be used anymore
+# matchedinter <- left_join(bp1, newinter) %>% filter(!is.na(inter)) 
+# 
+# # get selections from second selection table (bp2)
+# bp2 <- Rraven::imp_raven(path = here("w.selection.tables"), files = "boat_passage_2nd.txt", all.data = TRUE) 
+# bp2[21]<- bp2[14]
+# colnames(bp2)[21] <- "stfile"
+# 
+# # filter out intervals already present in bp1
+# oldinters <- unique(matchedinter$inter)
+# matchedinter2 <- left_join(bp2, newinter) %>% filter(!(Interval %in% oldinters) & !is.na(inter)) 
+# 
+# # combine all selections 
+# allmatchedinter <- bind_rows(matchedinter, matchedinter2) %>% 
+#   # name column indicating which selection table row comes from
+#   rename(which.table = selec.file) %>% 
+#   # remove repetitive columns
+#   select(-stfile, -inter)
+# 
+# # correct common typos
+# allmatchedinter[16] <- case_when(
+#   allmatchedinter[16]=="unkn"~"unkn",
+#   allmatchedinter[16]=="knock"~"knock",
+#   allmatchedinter[16]=="KNOCK"~"knock",
+#   allmatchedinter[16]=="grunt"~"grunt",
+#   allmatchedinter[16]=="grutn"~"grunt",
+#   allmatchedinter[16]=="grrunt"~"grunt")
+# 
+# # save windows version
+# write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+# 
+# ## code to change file paths for use on MAC ----
+# 
+# ### prelim manual selections
+# allmatchedinter[,13] <- stringr::str_replace_all(allmatchedinter[,13], "E:\\\\RCA_IN\\\\April_July2019\\\\boat_passage\\\\","/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19/")
+# write.table(allmatchedinter, file = "w.selection.tables/boat_passage_prelim_updated_mac.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+# 
+# sort(unique(allmatchedinter$Interval))
+# 
 ### EDITING SELECTION TABLES
 ### prelim auto selections
 
@@ -794,11 +797,12 @@ sort(unique(allmatchedinter$Interval))
 # # # rewrite path to work on PC
 # # allautoselect[,9] <- paste0("E:/RCA_IN/April_July2019/1342218252/",allautoselect[,9])
 # 
-# # Stephs selection table
+# Stephs selection table
 # allautoselect <- Rraven::imp_raven(path = here::here("selection.tables"),
 #   files = "boat_passage_random_selections_amp_10_Nov32020.txt",
 #   all.data = TRUE)
-# 
+## allautoselect %>% filter(`Manual Class` == "F") %>% group_by(Inter,Period) %>% summarise(n_calls = n())
+
 # # rewrite path to work on MAC
 # allautoselect[,9] <- paste0("/Volumes/SPERA_Rf_3_backup/RCA_IN/April_July2019/allboatpassage19x10db/", allautoselect[,11])
 # 
