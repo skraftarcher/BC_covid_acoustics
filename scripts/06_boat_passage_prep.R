@@ -59,24 +59,24 @@ allperiods2 <- allperiods %>%
   select(-et) %>%
   rename(period_id = st)
 
-
+# if the number of columns changes above this needs to be updated
 # load auto detector data
 all2019 <- Rraven::imp_raven(path = "w.selection.tables/",
   files = "Autodetect_Updated_April_July2019_Jan2021.txt",
-  all.data = TRUE)
+  all.data = TRUE)[,-19]
 
 new.files2<-Rraven::imp_raven(path = "w.selection.tables/",
   files = "Autodetect_RCA_In_200418_1205_5047_Jan2021.txt",
-  all.data = TRUE)
+  all.data = TRUE)[,-19]
 
 new.files3<-Rraven::imp_raven(path = "w.selection.tables/",
   files = "Autodetect_RCA_In_200524_1149_5042_Jan2021.txt",
-  all.data = TRUE)
+  all.data = TRUE)[,-19]
 
 all2020 <- bind_rows(new.files2,new.files3)
 
 # create a date time variable in each detection dataset
-all2019 <- new.files
+#all2019 <- new.files
 
 all2019 <-separate(all2019, stfile,
   into = c("st","yr","m","d","hr","min","s","ext"), 
