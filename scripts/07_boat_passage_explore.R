@@ -52,12 +52,21 @@ d2 <- filter(d, !(prd == "ferry" & type == "boat")) %>% mutate(
     prd == "post" & type == "boat" ~ "post-passage",
     type == "quiet" ~ "quiet"
   ), 
+  hmin = hour(dt1) + minute(dt1)/60,
+  doy = as.numeric(doy),
+  year = as.factor(year),
   prd_type = factor(prd_type, levels = c("pre-passage", "post-passage", "quiet")),
   pm=ifelse(inter %in% seq(21,236,2),"pm","am")
 )
 
+
+d2$hm <- 
 ggplot(d2, aes(prd_type, fish_count)) +
   geom_violin()
+
+
+ggplot(d2, aes(hr, fish_count)) +
+  geom_jitter()
 
 ggplot(filter(d2, !(prd == "ferry" & type == "quiet")), 
   aes(prd, fish_count)) +
@@ -70,8 +79,11 @@ aov1 <- lm(fish_count~prd_type + spl_mean, data = d2 )
 summary(aov1)
 
 
-mmod <- glmmTMB::glmmTMB(fish_count ~ prd*type*as.factor(year) + 
-    spl_mean + (spl_mean|inter), 
+mmod <- glmmTMB::glmmTMB(fish_count ~ prd*type*year + 
+    # hmin + 
+    doy +  
+    spl_mean + 
+    (spl_mean|inter), 
   family = nbinom2, # best one
   # family = nbinom1,
   # family = poisson,
@@ -86,7 +98,9 @@ plot(mmod_simres)
 # ggeffects plots
 library(ggeffects)
 
-p1 <- ggpredict(mmod, terms = c("prd", "type","year")) 
+p1 <- ggpredict(mmod, terms = c("prd", "type","year","pm")) 
+p1 <- ggpredict(mmod, terms = c("doy", "type", "prd", "year")) 
+p1 <- ggpredict(mmod, terms = c("spl_mean", "type", "prd", "year")) 
 
 plot(p1)
 
