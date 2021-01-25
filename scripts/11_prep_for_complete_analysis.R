@@ -1,6 +1,12 @@
 #This script preps the data for the complete analysis
 
+library(tidyverse)
+library(lubridate)
+library(readxl)
+
 # if the number of columns changes above this needs to be updated
+
+# ONLY NEED TO RUN THIS BIT ONCE, IF SECOND TIME START ON LINE 85
 # load auto detector data
 all2019 <- Rraven::imp_raven(path = "w.selection.tables/",
                              files = "Autodetect_Updated_April_July2019_Jan2021.txt",
@@ -59,7 +65,7 @@ all2020<-all2020%>%
 min.day<-min(all2020$datetime)
 year(min.day)<-2019
 max.day<-max(all2020$datetime)
-year(max.day)<-2020
+year(max.day)<-2019
 
 sub2019<-all2019%>%
   filter(datetime>=min.day)%>%
@@ -75,26 +81,55 @@ bothyrs <- bind_rows(sub2019,all2020) %>%
 #save this
 write_rds(bothyrs,"wdata/fish_calls_both_years_fulldataset.rds")
 
+
+#CAN START HERE FROM NOW ON
+bothyrs<-read_rds("wdata/fish_calls_both_years_fulldataset.rds")
+
 #bring in SPL data
-spl<-readRDS("wdata/spl_by_min.rds")
+spl1<-read_xlsx("odata/Broadband SPL RCA.xlsx", sheet = "RCA_In_2019")
+spl2<-read_xlsx("odata/Broadband SPL RCA.xlsx", sheet = "RCA_In_2020") 
+year(spl1$DateTime)<-2019
+year(spl2$DateTime)<-2020
+spl<-bind_rows(spl1,spl2)
 
 # It looks like there are two records of SPL for the places where a file started/stopped. Now the code averages those
-year(spl$DateTime) <- spl$year
+# investigating why we seem to lose some minutes 
+spl.check<-spl%>%
+  filter(yr==2019 & m==4 & d==30)
+
 spl <- arrange(spl, DateTime) %>% # note: so far all datetime vars have different names
-  filter(rca == "in") %>% select(-Year, -Deployment, -year)%>%
-  mutate(
+    mutate(
     yr=year(DateTime),
     m=month(DateTime),
     d=day(DateTime),
     hr=hour(DateTime),
-    min=minute(DateTime))%>%
+    hr2=hour(Time),
+    min2=minute(DateTime),
+    min=minute(Time))
+
+spl.mismatch<-spl[spl$min!=spl$min2,]
+# investigating why we seem to lose some minutes 
+
+#It looks like there's a difference in rounding between DateTime and Time for
+# minutes + seconds. Trying to see if using the minutes from Time corrects the problem
+
+spl<-spl %>%
   group_by(yr,m,d,hr,min)%>%
-  summarize(spl=mean(SPL))%>%
+  summarize(spl=mean(SPL,na.rm = TRUE))%>%
   distinct()
 
 #join to fish call dataset
 fish<-left_join(bothyrs,spl)%>%
   mutate(datetime=ymd_hm(paste(yr,m,d,hr,min)))
+
+fish.check<-filter(fish,is.na(spl))
+
+# using the minutes from Time rather than DateTime fixes it
+
+# still have 850 observations without spl data
+# figure this out. # all the observations missing an SPL are either at 12 or 42 minutes
+# in 2019 or at 2 or 24 in the first deployment of 2020
+# and at 19 minutes in the second deployment of 2020
 
 #bring in wind
 wind<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
