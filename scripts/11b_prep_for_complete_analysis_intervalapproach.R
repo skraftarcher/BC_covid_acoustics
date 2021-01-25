@@ -219,8 +219,8 @@ wind<-read_rds("wdata/trimmed_hourly_weather.rds")%>%
   select(yr=year,m=month,d=day,hr,wdir,wspeed)
 
 #join to fish call dataset
-fish<-left_join(fish,wind)%>%
-  filter(!is.na(wdir)) # this gets us down to the dates that we used for the larger anthropause data analysis 
+fish<-left_join(fish,wind)#%>%
+  #filter(!is.na(wdir)) # this gets us down to the dates that we used for the larger anthropause data analysis 
 
 #bring in wave data
 wave<-read.csv("odata/halibut_bank_wave_height.csv")%>%
