@@ -183,5 +183,3 @@ ggplot(fm.sum)+
   geom_point(aes(x=man.fish,y=auto.fish,color=spl))+
   geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
   scale_color_viridis_c()
-
-cor(fm.sum$auto.fish[1:167],fm.sum$man.fish[1:167])
