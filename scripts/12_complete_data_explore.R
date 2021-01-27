@@ -25,18 +25,41 @@ ggplot(data=fish%>%
 hist(fish$ncall)
 # looks like there's a bit of an outlier somewhere.
 
-# for now I will also rescale so that anything that is over 30 gets a value of 50
 fish2<-fish %>%
-  mutate(doy = strftime(datetime, format = "%j"),
+  mutate(utmDateTime = DateTime + hours(7),
+         doy = strftime(utmDateTime, format = "%j"),
          hr.min=hr+min/60,
          ncall2=ifelse(ncall<30,ncall,30))
 
-ggplot(fish2)+
-  geom_tile(aes(x=doy,y=hr.min,color=ncall2),size=.5)+
-  scale_y_reverse()+
-  facet_wrap(facets="yr",nrow=2)+
-  scale_color_viridis_c()
+fish2 %>% filter(yr == 2019) %>%
+ggplot()+
+  geom_tile(aes(doy,hr.min,color=ncall2),size=.5)+
+  scale_y_reverse(limits=c(24.2,-0.2), expand=c(0,0))+
+  scale_color_viridis_c(na.value = "red") +
+  ylab("Time of day") +
+  xlab("Day of Year") +
+  gfplot::theme_pbs()
   
+fish2 %>% filter(yr == 2020 & doy < 140) %>%
+  ggplot()+
+  geom_tile(aes(doy,hr.min,color=ncall2),size=.5)+
+  scale_y_reverse(limits=c(24.2,-0.2), expand=c(0,0))+
+  scale_color_viridis_c(na.value = "red") +
+  ylab("Time of day") +
+  xlab("Day of Year") +
+  gfplot::theme_pbs()
+
+fish2 %>% filter(yr == 2020 & doy > 140) %>%
+  ggplot()+
+  geom_tile(aes(doy, as.factor(hr.min), color=ncall2),
+    size=.5)+
+  # scale_y_reverse(limits=c(24.2,-0.2), expand=c(0,0))+
+  scale_color_viridis_c(na.value = "red") +
+  ylab("Time of day") +
+  xlab("Day of Year") +
+  gfplot::theme_pbs() +
+  theme(axis.text.y = element_blank() )
+
 
 # hard to visualize with the whole dataset because the second part of
 # the 2020 dataset is 15 min on 15 off and there's the big gap.
