@@ -604,3 +604,41 @@ mmod_simres <- simulateResiduals(mod2)
 testDispersion(mmod_simres) 
 plot(mmod_simres)
 
+# trying just a simple linear model
+
+call.lm.best<-lm(man.fish~auto.fish+
+                   spl+
+                   spl2+
+                   wind_spd+
+                   auto.fish*spl+
+                   auto.fish*spl2+
+                   wind_spd*spl+
+                   spl2*wind_spd,data=om.nona2)
+
+fm.nona2$lm.pred<-predict(call.lm.best,newdata=fm.nona2)
+
+fm.nona2<-fm.nona2%>%
+  mutate(lm.diff=lm.pred-man.fish)
+median(fm.nona2$lm.diff)
+median(fm.nona2$orig.diff)
+
+ggplot(data=fm.nona2)+
+  #  geom_histogram(aes(glm.2.diff,fill="GLM-model2"),bins=100,alpha=.5)+
+#  geom_histogram(aes(gam.diff,fill="GAM"),bins=100,alpha=.5)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.25)+
+  geom_histogram(aes(lm.diff,fill="LM"),bins=100,alpha=.5)+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("predicted - manual")
+ggsave("figures/lm_fit.jpg")
+
+
+ggplot(data=fm.nona2)+
+  geom_point(aes(x=man.fish,y=glm.2.pred),size=2)+
+  geom_text(aes(x=10,y=50),label="LM Prediction",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("GLM Prediction")+
+  xlab("Manual detections")
+ggsave("figures/lm_vs_man.jpg")
