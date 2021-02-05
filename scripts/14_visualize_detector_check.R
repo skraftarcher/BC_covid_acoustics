@@ -349,25 +349,25 @@ om.nona2 <- om.nona %>% ungroup() %>% mutate(
 fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
   # auto.fish = ifelse(auto.fish>35, 35, auto.fish),
   log.auto.fish = log(auto.fish+1),
-  log.fish.sc = scale(log.auto.fish),
+  log.fish.sc = (log.auto.fish-attributes(om.nona2$log.fish.sc)[[2]])/attributes(om.nona2$log.fish.sc)[[3]],
   auto.fish2 = auto.fish^2,
-  auto.fish.sc = scale(auto.fish),
+  auto.fish.sc = (auto.fish-attributes(om.nona2$auto.fish.sc)[[2]])/attributes(om.nona2$auto.fish.sc)[[3]],
   auto.fish.sc2 = auto.fish.sc^2,  
-  spl.sc = scale(spl),
+  spl.sc = (spl-attributes(om.nona2$spl.sc)[[2]])/attributes(om.nona2$spl.sc)[[3]],
   spl2 = spl^2,
   spl.sc2 = spl.sc^2,
-  wind.spd = scale(wind_spd),
+  wind.spd = (wind_spd-attributes(om.nona2$wind.spd)[[2]])/attributes(om.nona2$wind.spd)[[3]],
   wind.spd2 = wind.spd^2,
-  wave.ht = scale(wave.ht),
+  wave.ht = (wave.ht-attributes(om.nona2$wave.ht)[[2]])/attributes(om.nona2$wave.ht)[[3]],
   wave.ht2 = wave.ht^2,
   wind.dir.not.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 0, 1),
   wind.dir.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 1, 0),
   wind.dir.E = if_else(wind_dir >= 4.5 & wind_dir < 13.5, 1, 0),
   wind.dir.S = if_else(wind_dir >= 13.5 & wind_dir < 22.5, 1, 0),
   wind.dir.W = if_else(wind_dir >= 22.5 & wind_dir < 31.5, 1, 0),
-  wave.prd = scale(wave.prd),
+  wave.prd = (wave.prd-attributes(om.nona2$wave.prd)[[2]])/attributes(om.nona2$wave.prd)[[3]],
   wave.prd2 = wave.prd^2,
-  tide.sc = scale(tide),
+  tide.sc = (tide-attributes(om.nona2$tide.sc)[[2]])/attributes(om.nona2$tide.sc)[[3]],
   tide.sc2 = tide.sc^2,
   # temp.sc = scale(temp),
   ord = as.factor(spl.interval),
@@ -411,9 +411,11 @@ ggplot(om.nona2, aes(wave.ht, spl.sc, color = as.factor(wind.dir.not.N)
 
 
 library(mgcv)
-mod4 <- gamm(man.fish ~ log.fish.sc + #wind.dir.not.N + 
-    spl.sc + wind.spd + 
-    # s(spl.sc) + s(wind.spd) + 
+mod <- gamm(man.fish ~ log.fish.sc + #wind.dir.not.N + 
+    # spl.sc + 
+    wind.spd +
+    s(spl.sc) +
+    # s(wind.spd) +
     s(wave.ht) +
     s(wave.prd, k=3) #+
     # te(wave.ht, wave.prd, k=7) +
@@ -424,22 +426,24 @@ mod4 <- gamm(man.fish ~ log.fish.sc + #wind.dir.not.N +
   # + te(wind.spd, spl.sc) + te(auto.fish, wind.spd) + te(auto.fish, spl.sc)
   # , correlation=corAR1(form=~1|doy:hr),
   , correlation=corAR1(form=~1|spl.interval),
-  family=poisson,
+  family=poisson(),
+  # family=nbinom1(),
+  # family=nbinom2(), # lower R2 and all effects become linear
   data=om.nona2)
 
-summary(mod4$gam)
+summary(mod$gam)
+# plot(mod$gam)
 
- 
-plot(mod4$gam)
+
 
 # library(mgcViz)
-# p <- getViz(mod4$gam)
+# p <- getViz(mod$gam)
 # plot(sm(p, 1)) + l_fitRaster() + l_fitContour() + l_points()
-# visreg::visreg(mod4$gam)
-# visreg::visreg2d(mod4$gam, x=wave.ht, y=wave.prd)
+# visreg::visreg(mod$gam)
+# visreg::visreg2d(mod$gam, x=wave.ht, y=wave.prd)
 
-om.nona2$predicted <- exp(predict(mod4$gam))
-om.nona2$resids <- residuals(mod4$gam)
+om.nona2$predicted <- exp(predict(mod$gam))
+om.nona2$resids <- residuals(mod$gam)
 #improves fish
 mean(om.nona2$predicted-om.nona2$man.fish)
 mean(om.nona2$auto.fish-om.nona2$man.fish)
@@ -464,28 +468,38 @@ ggplot(om.nona2, aes(man.fish, predicted)) +
   geom_abline(intercept =0, slope=1)
 
 
+# Note that I believe these predictions (like all others here don't incorperate random effects, although the fixed effect estimates are with the random effect variation excluded)
+
+# need varible types to match for prediction so change data
+
+om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, month)
+
+om.nona3[] <- lapply(om.nona3, function(x) { attributes(x) <- NULL; x })
+str(om.nona3)
+
+mod4 <- gamm(man.fish ~ log.fish.sc + 
+    s(spl.sc) + wind.spd + 
+    s(wave.ht) +
+    s(wave.prd, k=3)
+  , correlation=corAR1(form=~1|spl.interval),
+  family=poisson,
+  data=om.nona3)
+
+# om.nona2$predicted <- exp(predict(mod4$gam))
+# om.nona2$resids <- residuals(mod4$gam)
+# 
+# plot(resids~predicted, data=om.nona2 )
+# plot(resids~man.fish, data=om.nona2 )
+# plot(resids~auto.fish, data=om.nona2 )
+# plot(mod4$gam)
 fm.nona2$gampred<-exp(predict(mod4$gam, newdata = fm.nona2))
-
-ggplot(data=fm.nona2)+
-  geom_point(aes(x=man.fish,y=auto.fish),size=2)+
-  geom_text(aes(x=10,y=50),label="Raw Autodetections",size=10)+
-  geom_abline(intercept=0,slope=1)+
-  theme_bw()+
-  theme(panel.grid = element_blank())
-
-ggplot(data=fm.nona2)+
-  geom_point(aes(x=man.fish,y=gampred),size=2)+
-  geom_text(aes(x=10,y=50),label="Gam Prediction",size=10)+
-  geom_abline(intercept=0,slope=1)+
-  theme_bw()+
-  theme(panel.grid = element_blank())
 
 
 # explore glmm options
 library(glmmTMB)
 mod1 <- glmmTMB(man.fish~
-    log.fish.sc + spl.sc + 
-    wind.spd +
+    log.fish.sc + spl.sc + spl.sc2 + 
+    wind.spd + wind.spd2 +
     # wind.spd * wind.dir.not.N + 
     # wave.ht + 
     # # poly(wave.ht, 2)+
@@ -498,7 +512,7 @@ mod1 <- glmmTMB(man.fish~
     ar1(as.factor(spl.interval)-1|month),
     # (1|doy) +
     # (1|doy:hr), 
-  family=nbinom2,
+  family=nbinom1,
   data=om.nona2)
 
 summary(mod1)
@@ -540,51 +554,43 @@ plot(p3) + scale_y_log10() +
 
 
 # best glmm
-
 mod2 <- glmmTMB(man.fish ~ log.fish.sc + spl.sc + wind.spd +
   ar1(as.factor(spl.interval)-1|month),
-  family=nbinom2(),
-  data=om.nona2)
+  family=nbinom1(),
+  # family=poisson(),
+  data=om.nona3)
 
 summary(mod2)
 # predict(mod2)
-
-fm.nona2$glm.2.pred<-exp(predict(mod2,newdata = fm.nona2, re.form = NA, allow.new.levels =T))
-
-
-ggplot(data=fm.nona2)+
-  geom_jitter(aes(x=man.fish,y=glm.2.pred),size=2)+
-  geom_text(aes(x=10,y=50),label="GLMMTMB model 2",size=10)+
-  geom_abline(intercept=0,slope=1)+
-  theme_bw()+
-  theme(panel.grid = element_blank())#+
-  # ylab("GAM Prediction - Manual detections")+
-  # xlab("Auto detections - Manual detections")
-
 library(DHARMa)
 # check residuals: not amazing, but not terrible
 mmod_simres <- simulateResiduals(mod2) 
 testDispersion(mmod_simres) 
 plot(mmod_simres)
 
+fm.nona2$glmm.pred<-exp(predict(mod2,newdata = fm.nona2, re.form = NA, allow.new.levels =T))
 
 
-# trying just a simple linear model
-call.lm<-lm(man.fish~auto.fish+
-    spl+
-    auto.fish+
-    wind_spd,
-  data=om.nona2)
+
+# trying just a simple linear model but with scaled covariates to reduce leverage
+om.nona3<-om.nona3%>%
+  mutate(spl.sc2=spl.sc^2)
+
+call.glm<-glm(man.fish~auto.fish.sc+
+    spl.sc + #spl.sc2 +
+    wind.spd,
+  family = poisson,
+  data=om.nona3)
 
 summary(call.lm)
 
-# residuals are terrible 
-# plot(call.lm)
-# fm.nona2$lm.pred<-predict(call.lm,newdata=fm.nona2)
+# residuals are pretty bad
+# plot(call.glm)
+fm.nona2$glm.pred1<-(predict(call.glm,newdata=fm.nona2, type = 'response'))
 
 
 # what about a log-log model?
-om.nona2<-om.nona2%>%
+om.nona3<-om.nona3%>%
   mutate(log.man.fish=log(man.fish+1))
 
 ggplot(data=om.nona2)+
@@ -609,18 +615,19 @@ ggplot(data=om.nona2)+
   xlab("Manual detections")
 ggsave("figures/auto_vs_man_1m.jpg")
 
-call.lm.best<-lm(log.man.fish~log.auto.fish+
-    spl+
-    auto.fish+
-    wind_spd,
-  data=om.nona2)
+
+call.lm.best<-lm(log.man.fish~log.fish.sc+
+    spl.sc + spl.sc2 +
+    wind.spd #+ wind.spd2
+  ,
+  data=om.nona3)
 
 
 summary(call.lm.best)
 
 # residuals are still pretty bad compared to the glm, but lots better than raw
 # plot(call.lm.best)
-fm.nona2$lm.pred<-exp(predict(call.lm.best,newdata=fm.nona2))
+fm.nona2$lm.pred<-exp(predict(call.lm.best,newdata=fm.nona2, type = 'response'))
 
 ## test with random effects but doesn't help at all
 # library(lmerTest)
@@ -636,29 +643,41 @@ fm.nona2<-fm.nona2%>%
 
 #lm 
 fm.nona2<-fm.nona2%>%
-  mutate(lm.diff=lm.pred-man.fish)
+  mutate(lm.diff=lm.pred-man.fish,
+    glm.diff=glm.pred1-man.fish)
 
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
-  geom_histogram(aes(lm.diff,fill="LM"),bins=100,alpha=.5)+
-  xlim(-35,15) +
+  geom_histogram(aes(lm.diff,fill="Log-log"),bins=100,alpha=.5)+
+  xlim(-35,45) +
   theme_bw()+
   theme(panel.grid = element_blank())+
   xlab("Difference between predicted and manual")
-ggsave("figures/lm_fit_raw.jpg")
+ggsave("figures/lm_fit_log_sc.jpg")
 
-# glm
-fm.nona2<-fm.nona2%>%
-  mutate(glm.2.diff=glm.2.pred-man.fish)
 
+# glm poisson
 ggplot(data=fm.nona2)+
-  geom_histogram(aes(glm.2.diff,fill="GLM2"),bins=100,alpha=.5)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
-  xlim(-35,15) +
+  geom_histogram(aes(glm.diff,fill="GLM"),bins=100,alpha=.5)+
+  xlim(-35,45) +
   theme_bw()+
   theme(panel.grid = element_blank())+
   xlab("Difference between predicted and manual")
 ggsave("figures/glm_fit.jpg")
+
+# glmm negbinomial 1
+fm.nona2<-fm.nona2%>%
+  mutate(glmm.diff=glmm.pred-man.fish)
+
+ggplot(data=fm.nona2)+
+  geom_histogram(aes(glmm.diff,fill="GLMM"),bins=100,alpha=.5)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  xlim(-35,45) +
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("Difference between predicted and manual")
+ggsave("figures/glmm_fit.jpg")
 
 
 # gam
@@ -669,7 +688,7 @@ fm.nona2<-fm.nona2%>%
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
   geom_histogram(aes(gam.diff,fill="GAM"),bins=100,alpha=.5)+
-  xlim(-35,15) +
+  xlim(-35,45) +
   theme_bw()+
   theme(panel.grid = element_blank())+
   xlab("Difference between predicted and manual")
@@ -677,48 +696,54 @@ ggplot(data=fm.nona2)+
 ggsave("figures/gam_fit.jpg")
 
 # diff from manual prediction in the 5 minute dataset 
-
-median(fm.nona2$lm.diff)
-median(fm.nona2$glm.2.diff)
-median(fm.nona2$gam.diff)
+# note that autodetector for 5min is mostly quiet periods
 median(fm.nona2$orig.diff)
+median(fm.nona2$lm.diff)
+median(fm.nona2$glm.diff)
+median(fm.nona2$glmm.diff) # BEST!
+median(fm.nona2$gam.diff)
 
-mean(fm.nona2$lm.diff)
-mean(fm.nona2$glm.2.diff)
+mean(fm.nona2$orig.diff) # so detector misses ~3 calls 
+mean(fm.nona2$lm.diff)# BEST
+mean(fm.nona2$glm.diff)
+mean(fm.nona2$glmm.diff)
 mean(fm.nona2$gam.diff)
-mean(fm.nona2$orig.diff)
+
 
 
 # scatterplot of predictions against manual detections
 ggplot(data=fm.nona2)+
-  geom_jitter(aes(x=man.fish,y=lm.pred),size=2)+
-  geom_text(aes(x=15,y=55),label="LM Prediction",size=10)+
+  geom_jitter(aes(x=man.fish,y=lm.pred, colour=spl.sc),size=2)+
+  geom_text(aes(x=20,y=75),label="LM Prediction",size=10)+
   geom_abline(intercept=0,slope=1)+
-  coord_fixed(xlim = c(0,65), ylim = c(0,65)) +
+  coord_fixed(xlim = c(0,80), ylim = c(0,80)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
   ylab("LM Prediction")+
   xlab("Manual detections")
-ggsave("figures/lm_vs_man.jpg")
+ggsave("figures/lm_vs_man_sc.jpg")
 
 
 ggplot(data=fm.nona2)+
-  geom_jitter(aes(x=man.fish,y=glm.2.pred),size=2)+
-  geom_text(aes(x=15,y=55),label="GLM Prediction",size=10)+
+  geom_jitter(aes(x=man.fish,y=glmm.pred, colour=spl.sc),size=2)+
+  geom_text(aes(x=20,y=75),label="GLM Prediction",size=10)+
   geom_abline(intercept=0,slope=1)+
-  coord_fixed(xlim = c(0,60), ylim = c(0,60)) +
+  coord_fixed(xlim = c(0,80), ylim = c(0,80)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
   ylab("GLM Prediction")+
   xlab("Manual detections")
-ggsave("figures/glm_vs_man.jpg")
+ggsave("figures/glmm_vs_man.jpg")
 
 
 ggplot(data=fm.nona2)+
-  geom_jitter(aes(x=man.fish,y=gampred),size=2)+
-  geom_text(aes(x=15,y=55),label="GAM Prediction",size=10)+
+  geom_jitter(aes(x=man.fish,y=gampred, colour=spl.sc),size=2)+
+  geom_text(aes(x=25,y=75),label="GAM Prediction",size=10)+
   geom_abline(intercept=0,slope=1)+
-  coord_fixed(xlim = c(0,60), ylim = c(0,60)) +
+  coord_fixed(xlim = c(0,80), ylim = c(0,80)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
   ylab("GAM Prediction")+
@@ -727,10 +752,11 @@ ggsave("figures/gam_vs_man.jpg")
 
 
 ggplot(data=fm.nona2)+
-  geom_jitter(aes(x=man.fish,y=auto.fish),size=2)+
-  geom_text(aes(x=20,y=55),label="Auto detections (5 min)",size=10)+
+  geom_jitter(aes(x=man.fish,y=auto.fish, colour=spl.sc),size=2,alpha=0.75)+
+  geom_text(aes(x=35,y=75),label="Auto detections (5 min)",size=10)+
   geom_abline(intercept=0,slope=1)+
-  coord_fixed(xlim = c(0,60), ylim = c(0,60)) +
+  coord_fixed(xlim = c(0,80), ylim = c(0,80)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
   ylab("Auto detections")+
@@ -741,13 +767,52 @@ fm.nona2<-fm.nona2%>%
   mutate(log.man.fish=log(man.fish+1))
 
 ggplot(data=om.nona2)+
-  geom_jitter(aes(x=log.man.fish,y=log.auto.fish),size=2)+
-  geom_text(aes(x=1.5,y=4),label="Auto detections (5 min)",size=10)+
+  geom_jitter(aes(x=log.man.fish,y=log.auto.fish, colour=spl.sc),size=2, width = .15)+
+  geom_text(aes(x=2,y=4),label="Auto detections (5 min)",size=10)+
   geom_abline(intercept=0,slope=1)+
   coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
   ylab("Log auto detections")+
   xlab("Log manual detections")
 ggsave("figures/auto_vs_man_5m_log.jpg")
 
+# log-log scatterplot of predictions against manual detections
+ggplot(data=fm.nona2)+
+  geom_jitter(aes(x=log(man.fish+1),y=log(lm.pred+1), colour=spl.sc),size=2, width = .15)+
+  # geom_text(aes(x=20,y=75),label="LM Prediction",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+  scale_color_viridis_c()+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("LM Prediction")+
+  xlab("Manual detections")
+ggsave("figures/lm_vs_man_ls.jpg")
+
+
+ggplot(data=fm.nona2)+
+  geom_jitter(aes(x=log(man.fish+1),y=log(glmm.pred+1), colour=spl.sc),size=2, width = .15)+
+  geom_text(aes(x=20,y=75),label="GLMM Prediction",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+  scale_color_viridis_c()+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("GLMM Prediction")+
+  xlab("Manual detections")
+ggsave("figures/glmm_vs_man_ls.jpg")
+
+
+ggplot(data=fm.nona2)+
+  geom_jitter(aes(x=log(man.fish+1),y=log(gampred+1), colour=spl.sc),size=2, width = .15)+
+  geom_text(aes(x=25,y=75),label="GAM Prediction",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+  scale_color_viridis_c()+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("GAM Prediction")+
+  xlab("Manual detections")
+ggsave("figures/gam_vs_man_ls.jpg")
