@@ -75,6 +75,13 @@ om.auto<-om %>%
   pivot_wider(names_from = auto.class,values_from=ncall,values_fill=c(0))%>%
   rename(auto.fish=FS,auto.non=NN)
 
+fm.auto<-fm %>%
+  mutate(auto.class=ifelse(is.na(auto.class),"NN",auto.class))%>%
+  group_by(spl.interval,auto.class)%>%
+  summarize(ncall=n())%>%
+  pivot_wider(names_from = auto.class,values_from=ncall,values_fill=c(0))%>%
+  rename(auto.fish=FS,auto.non=NN)
+
 #also for the purposes of this I'm going to assign the calls manually labeled FS as N because these are
 #calls that were split across multiple detections
 om.man<-om %>%
@@ -84,6 +91,12 @@ om.man<-om %>%
   pivot_wider(names_from = man.class,values_from=ncall,values_fill=c(0))%>%
   rename(man.fish=F,man.non=N)
 
+fm.man<-fm %>%
+  mutate(man.class=ifelse(man.class=="FS","N",man.class))%>%
+  group_by(spl.interval,man.class)%>%
+  summarize(ncall=n())%>%
+  pivot_wider(names_from = man.class,values_from=ncall,values_fill=c(0))%>%
+  rename(man.fish=F,man.non=N)
 # now get mean spl per interval
 
 # pull in downloaded tide data from
@@ -128,10 +141,34 @@ om.spl<-om%>%
     month=min(m,na.rm = T)
   )
 
+fm.spl<-fm%>%
+  left_join(tides)%>%
+  mutate(
+    utmDateTime = datetime + hours(7),
+    doy = as.numeric(strftime(utmDateTime, format = "%j"))
+  )%>%
+  group_by(spl.interval)%>%
+  summarize(
+    spl=mean(SPL,na.rm = T),
+    tide = mean(tide,na.rm = T),
+    wave.ht=mean(wave.ht),na.rm = T,
+    wave.prd=mean(wave.prd,na.rm = T),
+    wind_spd=mean(wind_spd,na.rm = T),
+    wind_dir=mean(wind_dir,na.rm = T),
+    temp=mean(temp,na.rm = T),
+    min=min(min,na.rm = T),
+    hr=min(hr,na.rm = T),
+    doy=min(doy,na.rm = T),
+    month=min(m,na.rm = T)
+  )
 # now link these
 
 om.sum<-left_join(om.auto,om.man)%>%
   left_join(om.spl)%>%
+  mutate(tot.call=auto.fish+auto.non)
+
+fm.sum<-left_join(fm.auto,fm.man)%>%
+  left_join(fm.spl)%>%
   mutate(tot.call=auto.fish+auto.non)
 # %>%
 #   filter(tot.call>5)
@@ -163,6 +200,13 @@ om.nona<-om.sum %>%
   filter(!is.na(wave.prd))%>%
   filter(!is.na(wave.ht))
 
+fm.nona<-fm.sum %>%
+  filter(wave.prd<10)%>% # remove two extreme outliers
+  filter(!is.na(tide))%>%
+  filter(!is.na(wind_spd))%>%
+  filter(!is.na(wind_dir))%>%
+  filter(!is.na(wave.prd))%>%
+  filter(!is.na(wave.ht))
 # # do a quick linear model
 # call.lm<-lm(man.fish~auto.fish*spl*spl2*wind_spd,data=om.nona)
 # summary(call.lm)
@@ -301,6 +345,34 @@ om.nona2 <- om.nona %>% ungroup() %>% mutate(
     hr = as.factor(hr)
   )
 
+fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
+  # auto.fish = ifelse(auto.fish>35, 35, auto.fish),
+  log.auto.fish = log(auto.fish+1),
+  log.fish.sc = scale(log.auto.fish),
+  auto.fish2 = auto.fish^2,
+  auto.fish.sc = scale(auto.fish),
+  auto.fish.sc2 = auto.fish.sc^2,  
+  spl.sc = scale(spl),
+  spl2 = spl^2,
+  spl.sc2 = spl.sc^2,
+  wind.spd = scale(wind_spd),
+  wind.spd2 = wind.spd^2,
+  wave.ht = scale(wave.ht),
+  wave.ht2 = wave.ht^2,
+  wind.dir.not.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 0, 1),
+  wind.dir.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 1, 0),
+  wind.dir.E = if_else(wind_dir >= 4.5 & wind_dir < 13.5, 1, 0),
+  wind.dir.S = if_else(wind_dir >= 13.5 & wind_dir < 22.5, 1, 0),
+  wind.dir.W = if_else(wind_dir >= 22.5 & wind_dir < 31.5, 1, 0),
+  wave.prd = scale(wave.prd),
+  wave.prd2 = wave.prd^2,
+  tide.sc = scale(tide),
+  tide.sc2 = tide.sc^2,
+  # temp.sc = scale(temp),
+  ord = as.factor(spl.interval),
+  hr = as.factor(hr)
+)
+
 # black is N wind, red = not N wind
 ggplot(om.nona2, aes(as.factor(wind.dir.not.N), spl.sc, 
   color = as.factor(wind.dir.not.N))) + geom_boxplot() + 
@@ -368,12 +440,15 @@ plot(mod4$gam)
 
 # visreg::visreg2d(mod4$gam, x=wave.ht, y=wave.prd)
 
-om.nona2$predicted <- predict(mod4$gam)
+om.nona2$predicted <- exp(predict(mod4$gam))
 om.nona2$resids <- residuals(mod4$gam)
+#improves fish
+mean(om.nona2$predicted-om.nona2$man.fish)
+mean(om.nona2$auto.fish-om.nona2$man.fish)
 
 plot(resids~predicted, data = om.nona2)
 
-plot(exp(predicted)~(man.fish), data = om.nona2, ylim=c(0, 10), xlim=c(0, 10)) + abline(a=0, b=1)
+plot(predicted~(man.fish), data = om.nona2, ylim=c(0, 10), xlim=c(0, 10)) + abline(a=0, b=1)
 
 plot(auto.fish~man.fish, data = om.nona2, ylim=c(0, 10), xlim=c(0, 10)) + abline(a=0, b=1)
 
@@ -384,14 +459,45 @@ ggplot(om.nona2, aes(man.fish, auto.fish)) +
   coord_cartesian(ylim=c(0, 60), xlim=c(0, 60)) + 
   geom_abline(intercept =0, slope=1)
 
-ggplot(om.nona2, aes(man.fish, exp(predicted))) +
+ggplot(om.nona2, aes(man.fish, predicted)) +
   geom_jitter() +
   # coord_cartesian(ylim=c(0, 20), xlim=c(0, 20)) + 
   coord_cartesian(ylim=c(0, 60), xlim=c(0, 60)) + 
   geom_abline(intercept =0, slope=1)
 
 
-# predict(mod4$gam, newdata = )
+fm.nona2$gampred<-exp(predict(mod4$gam, newdata = fm.nona2))
+ggplot(data=fm.nona2)+
+  # geom_point(aes(x=man.fish,y=gampred),size=2)+
+  # geom_text(aes(x=10,y=50),label="Gam Prediction",size=10)+
+    geom_point(aes(x=man.fish,y=auto.fish),size=2)+
+    geom_text(aes(x=10,y=50),label="Raw Autodetections",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  theme_bw()+
+  theme(panel.grid = element_blank())
+
+fm.nona2<-fm.nona2%>%
+  mutate(gam.diff=gampred-man.fish,
+         orig.diff=auto.fish-man.fish)
+ggplot(data=fm.nona2)+
+  geom_point(aes(x=man.fish,y=exp(gampred)),size=2)+
+  geom_text(aes(x=10,y=50),label="Gam Prediction",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("GAM Prediction - Manual detections")+
+  xlab("Auto detections - Manual detections")
+
+ggplot(data=fm.nona2)+
+  geom_histogram(aes(gam.diff,fill="GAM"),bins=100,alpha=.5)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  ylab("Difference between predicted and manual")
+
+# GAM overfit and doesn't predict the 5 minute dataset that well.
+median(fm.nona2$gam.diff)
+median(fm.nona2$orig.diff)
 
 
 library(glmmTMB)
@@ -450,7 +556,11 @@ plot(p3) + scale_y_log10() +
 p4 <- ggpredict(mod1, terms = c("tide.sc","log.fish.sc"))
 plot(p4) + gfplot::theme_pbs() 
 
+#assess fit of model 1
+fm.pred<-fm.nona2[,colnames(fm.nona2)%in%colnames(om.nona2)]
 
+predict(mod1)
+# I can't get this to work
 
 mod2 <- glmmTMB(man.fish~
     log.fish.sc + spl.sc + 
@@ -461,6 +571,32 @@ mod2 <- glmmTMB(man.fish~
     (1|doy:hr), 
   family=nbinom2,
   data=om.nona2)
+
+fm.nona2$glm.2.pred<-exp(predict(mod2,newdata = fm.nona2))
+
+fm.nona2<-fm.nona2%>%
+  mutate(glm.2.diff=glm.2.pred-man.fish)
+ggplot(data=fm.nona2)+
+  geom_point(aes(x=man.fish,y=glm.2.pred),size=2)+
+  geom_text(aes(x=10,y=50),label="GLMMTMB model 2",size=10)+
+  geom_abline(intercept=0,slope=1)+
+  theme_bw()+
+  theme(panel.grid = element_blank())#+
+  # ylab("GAM Prediction - Manual detections")+
+  # xlab("Auto detections - Manual detections")
+
+# GLM overfit and doesn't predict the 5 minute dataset that well.
+ggplot(data=fm.nona2)+
+#  geom_histogram(aes(glm.2.diff,fill="GLM-model2"),bins=100,alpha=.5)+
+  geom_histogram(aes(gam.diff,fill="GAM"),bins=100,alpha=.5)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.25)+
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("predicted - manual")
+ggsave("figures/gam_fit.jpg")
+
+median(fm.nona2$glm.2.diff)
+median(fm.nona2$orig.diff)
 
 library(DHARMa)
 # check residuals: not amazing, but not terrible
