@@ -347,8 +347,7 @@ om.nona2 <- om.nona %>% ungroup() %>% mutate(
   )
 
 fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
-  # auto.fish = ifelse(auto.fish>35, 35, auto.fish),
-  log.auto.fish = log(auto.fish+1),
+  log.auto.fish = log((auto.fish)+1),
   log.fish.sc = (log.auto.fish-attributes(om.nona2$log.fish.sc)[[2]])/attributes(om.nona2$log.fish.sc)[[3]],
   auto.fish2 = auto.fish^2,
   auto.fish.sc = (auto.fish-attributes(om.nona2$auto.fish.sc)[[2]])/attributes(om.nona2$auto.fish.sc)[[3]],
@@ -371,7 +370,7 @@ fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
   tide.sc2 = tide.sc^2,
   # temp.sc = scale(temp),
   ord = as.factor(spl.interval),
-  hr = as.factor(hr)
+  hr = (hr)
 )
 
 # black is N wind, red = not N wind
@@ -472,10 +471,12 @@ ggplot(om.nona2, aes(man.fish, predicted)) +
 
 # need varible types to match for prediction so change data
 
-om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, month)
+om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.auto.fish, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, month, doy, hr)
 
 om.nona3[] <- lapply(om.nona3, function(x) { attributes(x) <- NULL; x })
 str(om.nona3)
+om.nona3$month.f <- as.factor(om.nona3$month)
+fm.nona2$month.f <- as.factor(fm.nona2$month)
 
 mod4 <- gamm(man.fish ~ log.fish.sc + 
     s(spl.sc) + wind.spd + 
@@ -497,6 +498,9 @@ fm.nona2$gampred<-exp(predict(mod4$gam, newdata = fm.nona2))
 
 # explore glmm options
 library(glmmTMB)
+
+om.nona2apr <- filter(om.nona2, month == 4)
+
 mod1 <- glmmTMB(man.fish~
     log.fish.sc + spl.sc + spl.sc2 + 
     wind.spd + wind.spd2 +
@@ -513,7 +517,8 @@ mod1 <- glmmTMB(man.fish~
     # (1|doy) +
     # (1|doy:hr), 
   family=nbinom1,
-  data=om.nona2)
+  data=om.nona2apr)
+  # data=om.nona2)
 
 summary(mod1)
 # x<-MuMIn::dredge(mod1)
@@ -554,11 +559,37 @@ plot(p3) + scale_y_log10() +
 
 
 # best glmm
-mod2 <- glmmTMB(man.fish ~ log.fish.sc + spl.sc + wind.spd +
-  ar1(as.factor(spl.interval)-1|month),
+mod2 <- glmmTMB(man.fish ~ log.fish.sc + spl.sc + wind.spd,# +
+    # (1|hr), 
+    # (1|doy),
+    # (1|month),
+    # ar1(as.factor(spl.interval)+0|month), # doesn't change anything
+  # ar1(as.factor(spl.interval)-2|month),
   family=nbinom1(),
   # family=poisson(),
   data=om.nona3)
+
+# om.nona3$res <- residuals(mod2)
+# om.nona4 <- om.nona3 %>%
+#   complete(spl.interval = 1:105886) 
+# 
+# acf(om.nona4$res, lag.max = 40, na.action = na.pass, ci = 0)
+om.nona3apr <- filter(om.nona3, month == 4)
+
+mod2 <- glmmTMB(man.fish ~ 
+    # poly(hr,2) * month +
+    # log.fish.sc * poly(spl.sc,2) +
+    log.fish.sc + spl.sc +
+    wind.spd +
+    (1|hr) +
+    # (1|month) +
+    # (1|doy),
+    # ar1(as.factor(spl.interval)+1|hr) + # doesn't change anything
+    ar1(as.factor(spl.interval)+0|month),
+  family=nbinom1(),
+  # family=poisson(),
+  data=om.nona3apr)
+  # data=om.nona3)
 
 summary(mod2)
 # predict(mod2)
@@ -568,7 +599,7 @@ mmod_simres <- simulateResiduals(mod2)
 testDispersion(mmod_simres) 
 plot(mmod_simres)
 
-fm.nona2$glmm.pred<-exp(predict(mod2,newdata = fm.nona2, re.form = NA, allow.new.levels =T))
+fm.nona2$glmm.pred<-exp(predict(mod2, newdata = fm.nona2, re.form = NA, allow.new.levels =T))
 
 
 
@@ -576,57 +607,69 @@ fm.nona2$glmm.pred<-exp(predict(mod2,newdata = fm.nona2, re.form = NA, allow.new
 om.nona3<-om.nona3%>%
   mutate(spl.sc2=spl.sc^2)
 
-call.glm<-glm(man.fish~auto.fish.sc+
-    spl.sc + #spl.sc2 +
+call.glm<-glm(man.fish~auto.fish.sc *
+    poly(spl.sc, 2) + #spl.sc2 +
     wind.spd,
   family = poisson,
   data=om.nona3)
 
-summary(call.lm)
+summary(call.glm)
 
 # residuals are pretty bad
 # plot(call.glm)
-fm.nona2$glm.pred1<-(predict(call.glm,newdata=fm.nona2, type = 'response'))
+fm.nona2$glm.pred<-(predict(call.glm,newdata=fm.nona2, type = 'response'))
 
 
 # what about a log-log model?
 om.nona3<-om.nona3%>%
   mutate(log.man.fish=log(man.fish+1))
 
-ggplot(data=om.nona2)+
-  geom_jitter(aes(x=log.man.fish,y=log.auto.fish),size=2)+
+ggplot(data=om.nona3)+
+  geom_jitter(aes(x=log.auto.fish, y=log.man.fish,
+    colour=spl.sc),size=2, height = 0.1, width = 0.15)+
   geom_text(aes(x=1.5,y=4),label="Auto detections (1 min)",size=10)+
   geom_abline(intercept=0,slope=1)+
   coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
-  ylab("Log auto detections")+
-  xlab("Log manual detections")
+  xlab("Log auto detections")+
+  ylab("Log manual detections")
 ggsave("figures/auto_vs_man_1m_log.jpg")
 
 ggplot(data=om.nona2)+
-  geom_jitter(aes(x=man.fish,y=auto.fish),size=2)+
+  geom_jitter(aes(x=auto.fish,y=man.fish,
+    colour=spl.sc),size=2, height = 0.1, width = 0.15)+
   geom_text(aes(x=20,y=55),label="Auto detections (1 min)",size=10)+
   geom_abline(intercept=0,slope=1)+
   coord_fixed(xlim = c(0,60), ylim = c(0,60)) +
+  scale_color_viridis_c()+
   theme_bw()+
   theme(panel.grid = element_blank())+
-  ylab("Auto detections")+
-  xlab("Manual detections")
+  xlab("Auto detections")+
+  ylab("Manual detections")
 ggsave("figures/auto_vs_man_1m.jpg")
 
 
-call.lm.best<-lm(log.man.fish~log.fish.sc+
-    spl.sc + spl.sc2 +
+call.lm.best<-lm(log.man.fish~
+    month*poly(hr,2) +
+    # log.fish.sc*poly(spl.sc,2) +
+    log.fish.sc*spl.sc+
+    # log.fish.sc + spl.sc +
+    # poly(spl.sc,2) +
     wind.spd #+ wind.spd2
   ,
   data=om.nona3)
 
-
 summary(call.lm.best)
+
+AIC(call.lm.best)
+
+
 
 # residuals are still pretty bad compared to the glm, but lots better than raw
 # plot(call.lm.best)
+
 fm.nona2$lm.pred<-exp(predict(call.lm.best,newdata=fm.nona2, type = 'response'))
 
 ## test with random effects but doesn't help at all
@@ -644,7 +687,7 @@ fm.nona2<-fm.nona2%>%
 #lm 
 fm.nona2<-fm.nona2%>%
   mutate(lm.diff=lm.pred-man.fish,
-    glm.diff=glm.pred1-man.fish)
+    glm.diff=glm.pred-man.fish)
 
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
@@ -653,14 +696,14 @@ ggplot(data=fm.nona2)+
   theme_bw()+
   theme(panel.grid = element_blank())+
   xlab("Difference between predicted and manual")
-ggsave("figures/lm_fit_log_sc.jpg")
+ggsave("figures/lm_fit_log.jpg")
 
 
 # glm poisson
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
   geom_histogram(aes(glm.diff,fill="GLM"),bins=100,alpha=.5)+
-  xlim(-35,45) +
+  # xlim(-35,45) +
   theme_bw()+
   theme(panel.grid = element_blank())+
   xlab("Difference between predicted and manual")
@@ -670,7 +713,8 @@ ggsave("figures/glm_fit.jpg")
 fm.nona2<-fm.nona2%>%
   mutate(glmm.diff=glmm.pred-man.fish)
 
-ggplot(data=fm.nona2)+
+fm.nona2 %>% #filter(month==4) %>%
+ggplot()+
   geom_histogram(aes(glmm.diff,fill="GLMM"),bins=100,alpha=.5)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
   xlim(-35,45) +
