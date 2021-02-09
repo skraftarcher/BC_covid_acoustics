@@ -2,6 +2,9 @@
 library(tidyverse)
 library(ggeffects)
 library(lubridate)
+library(mgcv)
+library(mgcViz)
+library(glmmTMB)
 
 #read in data
 om<-read_rds("wdata/one_minute_review_reduceddata.rds")
@@ -233,7 +236,7 @@ fm.nona<-fm.sum %>%
 #   scale_color_viridis_c()
 
 ggplot(om.nona)+
-  geom_point(aes(x=man.fish,y=auto.fish,color=spl))+
+  geom_point(aes(x=auto.fish,y=man.fish,color=spl))+
   geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
   scale_color_viridis_c()
 
@@ -373,6 +376,16 @@ fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
   hr = (hr)
 )
 
+
+# need varible types to match for prediction so change data
+om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.auto.fish, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, wind_dir, month, doy, hr)
+
+om.nona3[] <- lapply(om.nona3, function(x) { attributes(x) <- NULL; x })
+str(om.nona3)
+om.nona3$month.f <- as.factor(om.nona3$month)
+fm.nona2$month.f <- as.factor(fm.nona2$month)
+
+
 # black is N wind, red = not N wind
 ggplot(om.nona2, aes(as.factor(wind.dir.not.N), spl.sc, 
   color = as.factor(wind.dir.not.N))) + geom_boxplot() + 
@@ -410,36 +423,42 @@ ggplot(om.nona2, aes(wave.ht, spl.sc, color = as.factor(wind.dir.not.N)
 
 
 library(mgcv)
-mod <- gamm(man.fish ~ log.fish.sc + #wind.dir.not.N + 
+mod <- gamm(man.fish ~ 
+    # log.fish.sc + 
     # spl.sc + 
-    wind.spd +
-    s(spl.sc) +
-    # s(wind.spd) +
-    s(wave.ht) +
-    s(wave.prd, k=3) #+
-    # te(wave.ht, wave.prd, k=7) +
-    # s(tide.sc) +
+    # wind.spd +
+    # s(wave.ht, bs = "ts") +
+    # s(wave.prd, bs = "ts", k=3) +
+   # s(spl.sc) +
+   #  s(log.fish.sc) +
+    # s(tide.sc, bs = "ts") +
+    # ti(wave.ht, wave.prd, bs = "ts") + 
+    te(spl.sc, log.fish.sc, bs = "ts") +#, k=c(3,3)
+    te(wind_dir, wind.spd, bs = c("cc", "ts")) + #, k=c(5,3)
+    # s(hr, doy,bs=c("cc", "re"), k=c(5,3)) # doesn't work
+    s(doy, bs="re")
+    # s(wave.prd, k=3)
     #  s(wind.spd, wind.dir.not.N, k=4)
-    # te(wind_dir, wind.spd, bs = "cc", k=10)
+    # te(wind_dir, wind.spd, bs = "cc", k=5)
     # s(wind_dir, bs = "cc", k=8)
   # + te(wind.spd, spl.sc) + te(auto.fish, wind.spd) + te(auto.fish, spl.sc)
   # , correlation=corAR1(form=~1|doy:hr),
   , correlation=corAR1(form=~1|spl.interval),
-  family=poisson(),
-  # family=nbinom1(),
-  # family=nbinom2(), # lower R2 and all effects become linear
-  data=om.nona2)
+  # family=poisson(), 
+  # family=nbinom1,
+  family=nbinom2, # lower R2 and all effects become linear
+  # data=om.nona2) # to experiment with other variables in full dataset
+  data=om.nona3)
 
 summary(mod$gam)
 # plot(mod$gam)
 
 
+p <- getViz(mod$gam)
+plot(p)
 
-# library(mgcViz)
-# p <- getViz(mod$gam)
-# plot(sm(p, 1)) + l_fitRaster() + l_fitContour() + l_points()
-# visreg::visreg(mod$gam)
-# visreg::visreg2d(mod$gam, x=wave.ht, y=wave.prd)
+plot(sm(p, 1)) + l_fitRaster() + l_fitContour() + l_points()
+plot(sm(p, 2)) + l_fitRaster() + l_fitContour() + l_points()
 
 om.nona2$predicted <- exp(predict(mod$gam))
 om.nona2$resids <- residuals(mod$gam)
@@ -469,36 +488,10 @@ ggplot(om.nona2, aes(man.fish, predicted)) +
 
 # Note that I believe these predictions (like all others here don't incorperate random effects, although the fixed effect estimates are with the random effect variation excluded)
 
-# need varible types to match for prediction so change data
-
-om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.auto.fish, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, month, doy, hr)
-
-om.nona3[] <- lapply(om.nona3, function(x) { attributes(x) <- NULL; x })
-str(om.nona3)
-om.nona3$month.f <- as.factor(om.nona3$month)
-fm.nona2$month.f <- as.factor(fm.nona2$month)
-
-mod4 <- gamm(man.fish ~ log.fish.sc + 
-    s(spl.sc) + wind.spd + 
-    s(wave.ht) +
-    s(wave.prd, k=3)
-  , correlation=corAR1(form=~1|spl.interval),
-  family=poisson,
-  data=om.nona3)
-
-# om.nona2$predicted <- exp(predict(mod4$gam))
-# om.nona2$resids <- residuals(mod4$gam)
-# 
-# plot(resids~predicted, data=om.nona2 )
-# plot(resids~man.fish, data=om.nona2 )
-# plot(resids~auto.fish, data=om.nona2 )
-# plot(mod4$gam)
-fm.nona2$gampred<-exp(predict(mod4$gam, newdata = fm.nona2))
+fm.nona2$gampred<-exp(predict(mod$gam, newdata = fm.nona2, re.form = NA ))
 
 
 # explore glmm options
-library(glmmTMB)
-
 om.nona2apr <- filter(om.nona2, month == 4)
 
 mod1 <- glmmTMB(man.fish~
@@ -517,8 +510,8 @@ mod1 <- glmmTMB(man.fish~
     # (1|doy) +
     # (1|doy:hr), 
   family=nbinom1,
-  data=om.nona2apr)
-  # data=om.nona2)
+  # data=om.nona2apr)
+  data=om.nona2)
 
 summary(mod1)
 # x<-MuMIn::dredge(mod1)
@@ -588,8 +581,8 @@ mod2 <- glmmTMB(man.fish ~
     ar1(as.factor(spl.interval)+0|month),
   family=nbinom1(),
   # family=poisson(),
-  data=om.nona3apr)
-  # data=om.nona3)
+  # data=om.nona3apr)
+  data=om.nona3)
 
 summary(mod2)
 # predict(mod2)
