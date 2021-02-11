@@ -475,61 +475,78 @@ write_rds(alrdydone,"wdata/datadist_alreadydone.rds")
 
 # # remove periods I've already done from possible selections for 2019
 # 
-# om2019fs.2<-filter(om2019fs,!spl.interval %in% om$spl.interval)
-# ad2<-alrdydone%>%
-#   pivot_longer(-1:-2,names_to = "spl.group2",values_to="n.done")
-# todo<-om2019fs[1,][-1,]
-# cgrp<-unique(ad2$call.group)
-# pgrp<-unique(ad2$phase)
-# sgrp<-c(1,2,3)
-# for(c in 1:3){
-#   for(p in 1:3){
-#     for(s in 1:3){
-#       n2do<-ad2%>%
-#         filter(call.group==cgrp[c])%>%
-#         filter(phase==pgrp[p])%>%
-#         filter(spl.group2==sgrp[s])
-#       if(n2do$n.done<5){
-#         do<-5-n2do$n.done
-#         t1<-om2019fs.2%>%
-#         filter(call.group==cgrp[c])%>%
-#         filter(phase==pgrp[p])%>%
-#         filter(spl.group2==sgrp[s])%>%
-#         slice_sample(n=do,replace=FALSE)
-#         todo<-bind_rows(todo,t1)
-#       }
-#     }
-#   }
-# }
-# 
-# follow.up.2019<-all2019%>%
-#   filter(`Begin File` %in% todo$`Begin File`)%>%
-#   select(-selec.file,-stfile,-st,-ext,-into.file)%>%
-#   mutate(old.selection=Selection,
-#          Selection=row_number())
-# 
-# 
-# follow.up.2019$`Begin Path`<-paste0("D:/RCA_IN/April_July2019/amplified_10/",follow.up.2019$`Begin Path`)
-# ftm<-follow.up.2019$`Begin File`[follow.up.2019$`Begin File`%in% list.files("D:/RCA_IN/April_July2019/1342218252/")]
-# ftm<-unique(ftm)
-# 
-# for (i in 1:length(ftm)){
-#     filesstrings::file.move(paste0("D:/RCA_IN/April_July2019/1342218252/",ftm[i]),
-#       "D:/RCA_IN/April_July2019/toamplify")
-# }
-# 
-# write.table(follow.up.2019,file="w.selection.tables/followup_minutes_to_evaluate.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-# 
-# # now pull 5 per category for 2020
-# 
-# om2020.2do<-om2020fs%>%
-#   group_by(call.group,phase,spl.group2)%>%
-#   slice_sample(n=5,replace=FALSE)
-# files.2020<-data.frame(files=unique(om2020.2do$`Begin File`))
-# review.2020<-all2020%>%
-#   filter(`Begin File` %in% files.2020)
-# 
-# review.2020$`Begin Path`<-paste0("D:/RCA_IN/April_July2020/amplified_10/",review.2020$`Begin Path`)
-# write.table(review.2020,file="w.selection.tables/2020review.txt", sep = "\t", row.names = FALSE, quote = FALSE)
-# 
-# write_csv(files.2020,"wdata/2020filesforsteph.csv")
+
+review.2020.files<-Rraven::imp_raven(path = "w.selection.tables/",
+                                     files = "2020review.txt",
+                                     all.data = TRUE)[,-29]
+
+review.2019.files<-Rraven::imp_raven(path = "w.selection.tables/",
+                                     files = "followup_minutes_to_evaluate.txt",
+                                     all.data = TRUE)[,-29]
+
+
+
+om2019fs.2<-filter(om2019fs,!spl.interval %in% om$spl.interval)%>%
+  filter(`Begin File` %in% review.2019.files$`Begin File`)
+
+om2020fs.2<-filter(om2020fs,`Begin File` %in% review.2020.files$`Begin File`)
+
+ad2<-alrdydone%>%
+  pivot_longer(-1:-2,names_to = "spl.group2",values_to="n.done")
+todo<-om2019fs[1,][-1,]
+cgrp<-unique(ad2$call.group)
+pgrp<-unique(ad2$phase)
+sgrp<-c(1,2,3)
+for(c in 1:3){
+  for(p in 1:3){
+    for(s in 1:3){
+      n2do<-ad2%>%
+        filter(call.group==cgrp[c])%>%
+        filter(phase==pgrp[p])%>%
+        filter(spl.group2==sgrp[s])
+      if(n2do$n.done<5){
+        do<-5-n2do$n.done
+        t1<-om2019fs.2%>%
+        filter(call.group==cgrp[c])%>%
+        filter(phase==pgrp[p])%>%
+        filter(spl.group2==sgrp[s])%>%
+        slice_sample(n=do,replace=FALSE)
+        todo<-bind_rows(todo,t1)
+      }
+    }
+  }
+}
+
+follow.up.2019<-all2019%>%
+  filter(spl.interval %in% todo$spl.interval)%>%
+  select(-selec.file,-stfile,-st,-ext,-into.file)%>%
+  mutate(old.selection=Selection,
+         Selection=row_number())
+
+
+follow.up.2019$`Begin Path`<-paste0("D:/RCA_IN/April_July2019/amplified_10/",follow.up.2019$`Begin Path`)
+ftm<-follow.up.2019$`Begin File`[follow.up.2019$`Begin File`%in% list.files("D:/RCA_IN/April_July2019/1342218252/")]
+ftm<-unique(ftm)
+
+for (i in 1:length(ftm)){
+    filesstrings::file.move(paste0("D:/RCA_IN/April_July2019/1342218252/",ftm[i]),
+      "D:/RCA_IN/April_July2019/toamplify")
+}
+
+write.table(follow.up.2019,file="w.selection.tables/followup_minutes_to_evaluate.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+# now pull 5 per category for 2020
+
+om2020.2do<-om2020fs.2%>%
+  group_by(call.group,phase,spl.group2)%>%
+  slice_sample(n=5,replace=FALSE)
+files.2020<-data.frame(files=unique(om2020.2do$`Begin File`))
+review.2020<-all2020%>%
+  filter(spl.interval %in% om2020.2do$spl.interval)%>%
+  mutate(old.selection=Selection,
+         Selection=row_number())
+
+review.2020$`Begin Path`<-paste0("D:/RCA_IN/April_July2020/amplified_10/",review.2020$`Begin Path`)
+write.table(review.2020,file="w.selection.tables/2020review.txt", sep = "\t", row.names = FALSE, quote = FALSE)
+
+write_csv(files.2020,"wdata/2020filesforsteph.csv")
