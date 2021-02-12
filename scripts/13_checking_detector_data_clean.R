@@ -17,6 +17,11 @@ follow.check<-Rraven::imp_raven(path = "w.selection.tables/",
                             files = "followup_minutes_to_evaluate.txt",
                             all.data = TRUE)
 
+#2020 chunks
+check20<-Rraven::imp_raven(path = "w.selection.tables/",
+                                files = "2020review.txt",
+                                all.data = TRUE)[,-33]
+
 # organize each dataset getting the time of each call to place into each minute
 # going to match each call again to make sure initial code worked
 am.2<-am.check%>%
@@ -78,12 +83,20 @@ follow.2<-follow.check%>%
          old.spl.int=spl.interval)%>%
   select(-selec.file)%>%
   mutate(datetime=ymd_hms(datetime))
+
+om.20<-check20%>%
+  rename(auto.class=Class,
+         old.spl.int=spl.interval)%>%
+  select(-selec.file)%>%
+  mutate(datetime=ymd_hms(datetime))
 # do the SPL thing
 # bring in SPL data
 
 spl19<-read_xlsx("odata/Broadband SPL RCA.xlsx", sheet = "RCA_In_2019")
- 
+spl20<-read_xlsx("odata/Broadband SPL RCA.xlsx", sheet = "RCA_In_2020")
+
 year(spl19$DateTime)<-2019
+year(spl20$DateTime)<-2020
 
 
 #create the date + time that we trust for the spl data
@@ -102,14 +115,31 @@ spl19.use<-spl19%>%
   select(DateTime2,SPL,spl.interval)%>%
   arrange(DateTime2)
 
+spl20.use<-spl20%>%
+  mutate(
+    yr=year(DateTime),
+    m=month(DateTime),
+    d=day(DateTime),
+    hr=hour(Time),
+    min=minute(Time),
+    sec=second(Time),
+    DateTime2=ymd_hms(paste(yr,m,d,hr,min,sec)),
+    spl.interval=row_number())%>%
+  select(DateTime2,SPL,spl.interval)%>%
+  arrange(DateTime2)
+
 # find interval in fish calls
 
 am.2$spl.interval<-findInterval(am.2$datetime,spl19.use$DateTime2)
 fm.2$spl.interval<-findInterval(fm.2$datetime,spl19.use$DateTime2)
 follow.2$spl.interval<-findInterval(follow.2$datetime,spl19.use$DateTime2)
+
+om.20$spl.interval<-findInterval(om.20$datetime,spl20.use$DateTime2)
+
 #now link with spl
 am.2<-left_join(am.2,spl19.use)
 follow.2<-left_join(follow.2,spl19.use)
+om.20<-left_join(om.20,spl20.use)
 #check one minute intervals to see if old code worked (mostly out of curiosity)
 plot(am.2$spl.old~am.2$SPL)
 # it didn't entirely. Interesting. 
@@ -153,9 +183,19 @@ wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-10",end="2019-0
          d=as.double(d),
          hr=as.double(hr))
 
+wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-10",end="2020-06-22")%>%
+  select(time,yr=year,m=month,d=day,hr=hour,wind_dir,wind_spd)%>%
+  separate(hr,into = c("hr","extra"),sep=":")%>%
+  mutate(yr=as.double(yr),
+         m=as.double(m),
+         d=as.double(d),
+         hr=as.double(hr))
+
 am.2<-left_join(am.2,wthr19)
 fm.2<-left_join(fm.2,wthr19)
 follow.2<-left_join(follow.2,wthr19)
+
+om.20<-left_join(om.20,wthr20)
 
 #Now bring in wave data
 wave<-read.csv("odata/halibut_bank_wave_height.csv")%>%
@@ -181,11 +221,13 @@ wave<-read.csv("odata/halibut_bank_wave_height.csv")%>%
 am.2<-left_join(am.2,wave)
 fm.2<-left_join(fm.2,wave)
 follow.2<-left_join(follow.2,wave)
+om.20<-left_join(om.20,wave)
 
 # write out big ugly datasets
 write_rds(am.2,"wdata/one_minute_review_allcolumns.rds")
 write_rds(fm.2,"wdata/five_minute_review_allcolumns.rds")
 write_rds(follow.2,"wdata/follow_up_2019_review_allcolumns.rds")
+write_rds(om.20,"wdata/2020_review_allcolumns.rds")
 
 # now select down to most useful columns
 am.3<-am.2%>%
@@ -250,10 +292,31 @@ follow.3<-follow.2%>%
          wave.prd,
          temp)
 
+om.20b<-om.20%>%
+  select(datetime,
+         yr,
+         m,
+         d,
+         hr,
+         min,
+         s,
+         auto.class,
+         Confidence,
+         man.class,
+         man.type,
+         spl.interval,
+         SPL,
+         wind_dir,
+         wind_spd,
+         wave.ht,
+         wave.prd,
+         temp)
+
 #write smaller datasets
 write_rds(am.3,"wdata/one_minute_review_reduceddata.rds")
 write_rds(fm.3,"wdata/five_minute_review_reduceddata.rds")
 write_rds(follow.3,"wdata/follow_up_2019_review_reduceddata.rds")
+write_rds(om.20b,"wdata/2020_review_reduceddata.rds")
 
 #one minute dataset with original 1 minute reviews and followup
 write_rds(bind_rows(am.3,follow.3),"wdata/one_minute_plus_followup.rds")

@@ -9,6 +9,9 @@ library(glmmTMB)
 #read in data
 om<-read_rds("wdata/one_minute_review_reduceddata.rds")
 fm<-read_rds("wdata/five_minute_review_reduceddata.rds")
+# NOTE: in interval 17755 in the 2020 dataset there is something rubbing on the hydrophone
+# if this is an outlier causing problems that may be a reason to remove it?
+om20<-read_rds("wdata/2020_review_reduceddata.rds")
 
 # first going to look at one minute data at old intervals and averaged spl
 # for the purposes of this I'm going to assign calls that the detector did not find to an auto.cass of NN
@@ -85,6 +88,13 @@ fm.auto<-fm %>%
   pivot_wider(names_from = auto.class,values_from=ncall,values_fill=c(0))%>%
   rename(auto.fish=FS,auto.non=NN)
 
+om20.auto<-om20 %>%
+  mutate(auto.class=ifelse(is.na(auto.class),"NN",auto.class))%>%
+  group_by(spl.interval,auto.class)%>%
+  summarize(ncall=n())%>%
+  pivot_wider(names_from = auto.class,values_from=ncall,values_fill=c(0))%>%
+  rename(auto.fish=FS,auto.non=NN)
+
 #also for the purposes of this I'm going to assign the calls manually labeled FS as N because these are
 #calls that were split across multiple detections
 om.man<-om %>%
@@ -100,6 +110,14 @@ fm.man <-fm %>%
   summarize(ncall=n())%>%
   pivot_wider(names_from = man.class,values_from=ncall,values_fill=c(0))%>%
   rename(man.fish=F,man.non=N)
+
+om20.man<-om20 %>%
+  mutate(man.class=ifelse(man.class=="FS","N",man.class))%>%
+  group_by(spl.interval,man.class)%>%
+  summarize(ncall=n())%>%
+  pivot_wider(names_from = man.class,values_from=ncall,values_fill=c(0))%>%
+  rename(man.fish=F,man.non=N)
+
 # now get mean spl per interval
 
 # pull in downloaded tide data from
@@ -164,6 +182,28 @@ fm.spl<-fm%>%
     doy=min(doy,na.rm = T),
     month=min(m,na.rm = T)
   )
+
+
+om20.spl<-om20%>%
+  left_join(tides)%>%
+  mutate(
+    utmDateTime = datetime + hours(7),
+    doy = as.numeric(strftime(utmDateTime, format = "%j"))
+  )%>%
+  group_by(spl.interval)%>%
+  summarize(
+    spl=mean(SPL,na.rm = T),
+    tide = mean(tide,na.rm = T),
+    wave.ht=mean(wave.ht),na.rm = T,
+    wave.prd=mean(wave.prd,na.rm = T),
+    wind_spd=mean(wind_spd,na.rm = T),
+    wind_dir=mean(wind_dir,na.rm = T),
+    temp=mean(temp,na.rm = T),
+    min=min(min,na.rm = T),
+    hr=min(hr,na.rm = T),
+    doy=min(doy,na.rm = T),
+    month=min(m,na.rm = T)
+  )
 # now link these
 
 om.sum<-left_join(om.auto,om.man)%>%
@@ -173,6 +213,14 @@ om.sum<-left_join(om.auto,om.man)%>%
 fm.sum<-left_join(fm.auto,fm.man)%>%
   left_join(fm.spl)%>%
   mutate(tot.call=auto.fish+auto.non)
+
+om20.sum<-left_join(om20.auto,om20.man)%>%
+  left_join(om20.spl)%>%
+  mutate(tot.call=auto.fish+auto.non)
+
+ggplot(om20.sum)+
+  geom_point(aes(y=auto.fish,x=man.fish,color=spl))+
+  geom_abline(slope=1,intercept=0)
 # %>%
 #   filter(tot.call>5)
 
