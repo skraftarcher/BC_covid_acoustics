@@ -258,6 +258,14 @@ fm.nona<-fm.sum %>%
   filter(!is.na(wind_dir))%>%
   filter(!is.na(wave.prd))%>%
   filter(!is.na(wave.ht))
+
+om20.nona<-om20.sum%>%
+  filter(wave.prd<10)%>% # remove two extreme outliers
+  filter(!is.na(tide))%>%
+  filter(!is.na(wind_spd))%>%
+  filter(!is.na(wind_dir))%>%
+  filter(!is.na(wave.prd))%>%
+  filter(!is.na(wave.ht))
 # # do a quick linear model
 # call.lm<-lm(man.fish~auto.fish*spl*spl2*wind_spd,data=om.nona)
 # summary(call.lm)
@@ -284,6 +292,11 @@ fm.nona<-fm.sum %>%
 #   scale_color_viridis_c()
 
 ggplot(om.nona)+
+  geom_point(aes(x=auto.fish,y=man.fish,color=spl))+
+  geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
+  scale_color_viridis_c()
+
+ggplot(om20.nona)+
   geom_point(aes(x=auto.fish,y=man.fish,color=spl))+
   geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
   scale_color_viridis_c()
@@ -424,7 +437,32 @@ fm.nona2 <- fm.nona %>% ungroup() %>% mutate(
   hr = (hr)
 )
 
-
+om20.nona2 <- om20.nona %>% ungroup() %>% mutate(
+  log.auto.fish = log((auto.fish)+1),
+  log.fish.sc = (log.auto.fish-attributes(om.nona2$log.fish.sc)[[2]])/attributes(om.nona2$log.fish.sc)[[3]],
+  auto.fish2 = auto.fish^2,
+  auto.fish.sc = (auto.fish-attributes(om.nona2$auto.fish.sc)[[2]])/attributes(om.nona2$auto.fish.sc)[[3]],
+  auto.fish.sc2 = auto.fish.sc^2,  
+  spl.sc = (spl-attributes(om.nona2$spl.sc)[[2]])/attributes(om.nona2$spl.sc)[[3]],
+  spl2 = spl^2,
+  spl.sc2 = spl.sc^2,
+  wind.spd = (wind_spd-attributes(om.nona2$wind.spd)[[2]])/attributes(om.nona2$wind.spd)[[3]],
+  wind.spd2 = wind.spd^2,
+  wave.ht = (wave.ht-attributes(om.nona2$wave.ht)[[2]])/attributes(om.nona2$wave.ht)[[3]],
+  wave.ht2 = wave.ht^2,
+  wind.dir.not.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 0, 1),
+  wind.dir.N = if_else(wind_dir < 4.5 | wind_dir >= 31.5, 1, 0),
+  wind.dir.E = if_else(wind_dir >= 4.5 & wind_dir < 13.5, 1, 0),
+  wind.dir.S = if_else(wind_dir >= 13.5 & wind_dir < 22.5, 1, 0),
+  wind.dir.W = if_else(wind_dir >= 22.5 & wind_dir < 31.5, 1, 0),
+  wave.prd = (wave.prd-attributes(om.nona2$wave.prd)[[2]])/attributes(om.nona2$wave.prd)[[3]],
+  wave.prd2 = wave.prd^2,
+  tide.sc = (tide-attributes(om.nona2$tide.sc)[[2]])/attributes(om.nona2$tide.sc)[[3]],
+  tide.sc2 = tide.sc^2,
+  # temp.sc = scale(temp),
+  ord = as.factor(spl.interval),
+  hr = (hr)
+)
 # need varible types to match for prediction so change data
 om.nona3 <- om.nona2 %>% select(spl.interval, man.fish, auto.fish.sc, log.auto.fish, log.fish.sc, spl.sc, wind.spd, wave.ht, wave.prd, wind_dir, month, doy, hr)
 
@@ -432,6 +470,7 @@ om.nona3[] <- lapply(om.nona3, function(x) { attributes(x) <- NULL; x })
 str(om.nona3)
 om.nona3$month.f <- as.factor(om.nona3$month)
 fm.nona2$month.f <- as.factor(fm.nona2$month)
+om20.nona2$month.f <- as.factor(om20.nona2$month)
 
 
 # black is N wind, red = not N wind
@@ -537,7 +576,7 @@ ggplot(om.nona2, aes(man.fish, predicted)) +
 # Note that I believe these predictions (like all others here don't incorperate random effects, although the fixed effect estimates are with the random effect variation excluded)
 
 fm.nona2$gampred<-exp(predict(mod$gam, newdata = fm.nona2, re.form = NA ))
-
+om20.nona2$gampred<-exp(predict(mod$gam, newdata = om20.nona2, re.form = NA ))
 
 # explore glmm options
 om.nona2apr <- filter(om.nona2, month == 4)
@@ -641,6 +680,7 @@ testDispersion(mmod_simres)
 plot(mmod_simres)
 
 fm.nona2$glmm.pred<-exp(predict(mod2, newdata = fm.nona2, re.form = NA, allow.new.levels =T))
+om20.nona2$glmm.pred<-exp(predict(mod2, newdata = om20.nona2, re.form = NA, allow.new.levels =T))
 
 
 
@@ -659,6 +699,7 @@ summary(call.glm)
 # residuals are pretty bad
 # plot(call.glm)
 fm.nona2$glm.pred<-(predict(call.glm,newdata=fm.nona2, type = 'response'))
+om20.nona2$glm.pred<-(predict(call.glm,newdata=om20.nona2, type = 'response'))
 
 
 # what about a log-log model?
@@ -712,6 +753,7 @@ AIC(call.lm.best)
 # plot(call.lm.best)
 
 fm.nona2$lm.pred<-exp(predict(call.lm.best,newdata=fm.nona2, type = 'response'))
+om20.nona2$lm.pred<-exp(predict(call.lm.best,newdata=om20.nona2, type = 'response'))
 
 ## test with random effects but doesn't help at all
 # library(lmerTest)
@@ -724,11 +766,17 @@ fm.nona2$lm.pred<-exp(predict(call.lm.best,newdata=fm.nona2, type = 'response'))
 
 fm.nona2<-fm.nona2%>%
   mutate(orig.diff=auto.fish-man.fish)
+om20.nona2<-om20.nona2%>%
+  mutate(orig.diff=auto.fish-man.fish)
 
 #lm 
 fm.nona2<-fm.nona2%>%
   mutate(lm.diff=lm.pred-man.fish,
     glm.diff=glm.pred-man.fish)
+
+om20.nona2<-om20.nona2%>%
+  mutate(lm.diff=lm.pred-man.fish,
+         glm.diff=glm.pred-man.fish)
 
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
@@ -739,6 +787,15 @@ ggplot(data=fm.nona2)+
   xlab("Difference between predicted and manual")
 ggsave("figures/lm_fit_log.jpg")
 
+ggplot(data=om20.nona2)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  geom_histogram(aes(lm.diff,fill="Log-log"),bins=100,alpha=.5)+
+  xlim(-35,45) +
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("Difference between predicted and manual")+
+  ggtitle("2020")
+ggsave("figures/lm_fit_log_2020.jpg")
 
 # glm poisson
 ggplot(data=fm.nona2)+
@@ -750,8 +807,21 @@ ggplot(data=fm.nona2)+
   xlab("Difference between predicted and manual")
 ggsave("figures/glm_fit.jpg")
 
+# glm poisson
+ggplot(data=om20.nona2)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  geom_histogram(aes(glm.diff,fill="GLM"),bins=100,alpha=.5)+
+  # xlim(-35,45) +
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("Difference between predicted and manual")+
+  ggtitle("2020")
+ggsave("figures/glm_fit_2020.jpg")
+
 # glmm negbinomial 1
 fm.nona2<-fm.nona2%>%
+  mutate(glmm.diff=glmm.pred-man.fish)
+om20.nona2<-om20.nona2%>%
   mutate(glmm.diff=glmm.pred-man.fish)
 
 fm.nona2 %>% #filter(month==4) %>%
@@ -764,11 +834,26 @@ ggplot()+
   xlab("Difference between predicted and manual")
 ggsave("figures/glmm_fit.jpg")
 
+om20.nona2 %>% #filter(month==4) %>%
+  ggplot()+
+  geom_histogram(aes(glmm.diff,fill="GLMM"),bins=100,alpha=.5)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  xlim(-35,45) +
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("Difference between predicted and manual")+
+  ggtitle("2020")
+ggsave("figures/glmm_fit_2020.jpg")
 
 # gam
 fm.nona2<-fm.nona2%>%
   mutate(gam.diff=gampred-man.fish,
     orig.diff=auto.fish-man.fish)
+
+om20.nona2<-om20.nona2%>%
+  mutate(gam.diff=gampred-man.fish,
+         orig.diff=auto.fish-man.fish)
+
 
 ggplot(data=fm.nona2)+
   geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
@@ -780,6 +865,16 @@ ggplot(data=fm.nona2)+
 
 ggsave("figures/gam_fit.jpg")
 
+ggplot(data=om20.nona2)+
+  geom_histogram(aes(orig.diff,fill="Auto"),bins=100,alpha=.5)+
+  geom_histogram(aes(gam.diff,fill="GAM"),bins=100,alpha=.5)+
+  xlim(-35,45) +
+  theme_bw()+
+  theme(panel.grid = element_blank())+
+  xlab("Difference between predicted and manual")+
+  ggtitle("2020")
+
+ggsave("figures/gam_fit_2020.jpg")
 # diff from manual prediction in the 5 minute dataset 
 # note that autodetector for 5min is mostly quiet periods
 median(fm.nona2$orig.diff)
@@ -794,7 +889,17 @@ mean(fm.nona2$glm.diff)
 mean(fm.nona2$glmm.diff)
 mean(fm.nona2$gam.diff)
 
+median(om20.nona2$orig.diff)
+median(om20.nona2$lm.diff)
+median(om20.nona2$glm.diff) # BEST!
+median(om20.nona2$glmm.diff) 
+median(om20.nona2$gam.diff)
 
+mean(om20.nona2$orig.diff) # so detector misses ~2 calls 
+mean(om20.nona2$lm.diff)
+mean(om20.nona2$glm.diff)
+mean(om20.nona2$glmm.diff)
+mean(om20.nona2$gam.diff)# BEST
 
 # scatterplot of predictions against manual detections
 ggplot(data=fm.nona2)+

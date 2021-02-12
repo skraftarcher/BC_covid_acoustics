@@ -20,7 +20,9 @@ follow.check<-Rraven::imp_raven(path = "w.selection.tables/",
 #2020 chunks
 check20<-Rraven::imp_raven(path = "w.selection.tables/",
                                 files = "2020review.txt",
-                                all.data = TRUE)[,-33]
+                                all.data = TRUE)[,-33]%>%
+  filter(man.class!="")%>%
+  filter(!is.na(man.class))
 
 # organize each dataset getting the time of each call to place into each minute
 # going to match each call again to make sure initial code worked
@@ -88,7 +90,11 @@ om.20<-check20%>%
   rename(auto.class=Class,
          old.spl.int=spl.interval)%>%
   select(-selec.file)%>%
-  mutate(datetime=ymd_hms(datetime))
+  mutate(into.file=ifelse(is.na(into.file),`File Offset (s)`,into.file),
+         datetime=ymd_hms(paste(yr,m,d,hr,min,s)),
+         datetime=case_when(
+           is.na(old.selection)~datetime+into.file,
+           !is.na(old.selection)~datetime))
 # do the SPL thing
 # bring in SPL data
 
