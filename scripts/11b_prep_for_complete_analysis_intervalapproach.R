@@ -233,7 +233,7 @@ fish.19.g<-fish.19.spl %>%
   distinct()#%>%
   # select(-spl.interval)
 
-fish.19.g <- left_join(spl2019.1, fish.19.g)
+fish.19.g <- left_join(spl2019.1, fish.19.g) %>% mutate(deployment = "1")
  
 
 fish.20.1.g<-fish.20.1.spl %>%
@@ -243,7 +243,7 @@ fish.20.1.g<-fish.20.1.spl %>%
   distinct()#%>%
   # select(-spl.interval)
 
-fish.20.1.g <- left_join(spl2020.1, fish.20.1.g)
+fish.20.1.g <- left_join(spl2020.1, fish.20.1.g) %>% mutate(deployment = "2")
 
 
 fish.20.2.g<-fish.20.2.spl %>%
@@ -253,11 +253,11 @@ fish.20.2.g<-fish.20.2.spl %>%
   distinct()#%>%
   # select(-spl.interval)
 
-fish.20.2.g <- left_join(spl2020.2, fish.20.2.g)
+fish.20.2.g <- left_join(spl2020.2, fish.20.2.g) %>% mutate(deployment = "3")
 
 fish<-bind_rows(fish.19.g,fish.20.1.g,fish.20.2.g) %>%
   select(#spl.interval, 
-    DateTime = DateTime2, spl = SPL, ncall) %>%
+    DateTime = DateTime2, deployment, spl.interval, spl = SPL, ncall) %>%
   mutate(yr=year(DateTime),
          m=month(DateTime),
          d=day(DateTime),
