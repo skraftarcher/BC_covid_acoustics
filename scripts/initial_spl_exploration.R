@@ -11,7 +11,7 @@ theme_set(theme_bw())
 
 
 ## data----
-in19<-read_xlsx("odata/Broadband SPL RCA.xlsx",sheet = "RCA_In_2019")
+in19<-read_xlsx("odata/Broadband SPL RCA2.xlsx",sheet = "RCA_In_2019")
 in20<-read_xlsx("odata/Broadband SPL RCA.xlsx",sheet = "RCA_In_2020")
 out19<-read_xlsx("odata/Broadband SPL RCA.xlsx",sheet = "RCA_Out_2019")
 out20<-read_xlsx("odata/Broadband SPL RCA.xlsx",sheet = "RCA_Out_2020")
@@ -128,11 +128,11 @@ ggplot(splhr2)+
   facet_grid(~rca,scales="free")
 
 # get weather data
-# note: may require updated version of tidyselect package
+# note: may require updated version of tidyselect package and a reinstall of weathercan
 if(!require(weathercan)) devtools::install_github("ropensci/weathercan")
 
-wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-18",end="2019-06-22")
-wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-18",end="2020-06-22")   
+wthr19<-weathercan::weather_dl(station_ids=29411, start="2019-04-10",end="2019-06-25")
+wthr20<-weathercan::weather_dl(station_ids=29411, start="2020-04-10",end="2020-06-22")   
 
 # add weather by day
 wthr<-bind_rows(wthr19,wthr20)%>% 
@@ -242,3 +242,26 @@ hr_wthr2 <- bind_rows(hr_wthr1.19, hr_wthr1.20, hr_wthr2.19, hr_wthr2.20)
 saveRDS(wthr2, "wdata/trimmed_hourly_weather.rds")
 wthr2 <- readRDS("wdata/trimmed_hourly_weather.rds")
 write.csv(wthr2, "wdata/trimmed_hourly_weather.csv")
+
+
+# all weather by hr 
+all_wthr <- bind_rows(wthr19, wthr20) %>%
+  mutate(time = hour) %>%
+  separate(hour, into = c("hr", "min"), sep = ":") %>%
+  select(date, 
+    yr = year,
+    m = month,
+    d = day,
+    hr, time,    
+    wdir = wind_dir,
+    wspeed = wind_spd
+  ) %>%
+  mutate(
+    yr = as.numeric(yr),
+    m = as.numeric(m),
+    d = as.numeric(d),
+    hr = as.numeric(hr)
+  ) 
+saveRDS(all_wthr, "wdata/all_hourly_weather.rds")
+all_wthr <- readRDS("wdata/all_hourly_weather.rds")
+write.csv(all_wthr, "wdata/all_hourly_weather.csv")
