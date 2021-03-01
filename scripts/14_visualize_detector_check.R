@@ -190,6 +190,7 @@ om20.spl<-om20%>%
     utmDateTime = datetime + hours(7),
     doy = as.numeric(strftime(utmDateTime, format = "%j"))
   )%>%
+  select(-B, -K, -NF)%>%
   group_by(spl.interval)%>%
   summarize(
     spl=mean(SPL,na.rm = T),
@@ -232,15 +233,15 @@ reg <- lm(log(man.fish+1)~log(auto.fish+1), data=om.sum)
 summary(reg)
 # plot(reg)
 
-om.sum$resids<-exp(residuals(reg, type = "response"))-1
+# om.sum$resids<-exp(residuals(reg, type = "response"))-1
 
 om.sum2<-om.sum%>%filter(wave.prd<10)%>% 
   pivot_longer(spl:tot.call,names_to="measure",values_to="values") 
 
 
-ggplot(data=om.sum2)+
-  geom_point(aes(x=values,y=resids))+
-  facet_wrap(~measure,scales="free")
+# ggplot(data=om.sum2)+
+#   geom_point(aes(x=values,y=resids, colour=year))+
+#   facet_wrap(~measure,scales="free")
 
 om.sum$spl2<-om.sum$spl^2
 om.nona<-om.sum %>%
@@ -259,6 +260,7 @@ fm.nona<-fm.sum %>%
   filter(!is.na(wave.prd))%>%
   filter(!is.na(wave.ht))
 
+om20.sum$spl2<-om20.sum$spl^2
 om20.nona<-om20.sum%>%
   filter(wave.prd<10)%>% # remove two extreme outliers
   filter(!is.na(tide))%>%
@@ -292,14 +294,17 @@ om20.nona<-om20.sum%>%
 #   scale_color_viridis_c()
 
 ggplot(om.nona)+
-  geom_point(aes(x=auto.fish,y=man.fish,color=spl))+
+  geom_jitter(aes(x=auto.fish,y=man.fish,color=spl), shape=1, size = 3, alpha =0.9)+
+  geom_jitter(data = om20.nona, aes(x=auto.fish,y=man.fish,color=spl), shape=19, size = 3, alpha =0.7, inherit.aes = F)+
   geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
-  scale_color_viridis_c()
+  xlim(0,60) + ylim(0,70) +
+  scale_color_viridis_c() + ggsidekick::theme_sleek()
 
-ggplot(om20.nona)+
-  geom_point(aes(x=auto.fish,y=man.fish,color=spl))+
-  geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
-  scale_color_viridis_c()
+# ggplot(om20.nona)+
+#   geom_jitter(aes(x=auto.fish,y=man.fish,color=spl), alpha =0.7, shape=19)+
+#   geom_abline(aes(slope=1,intercept=0),linetype="dashed")+
+#   xlim(0,50) + ylim(0,70) +
+#   scale_color_viridis_c()
 
 # # get dataset to point to check model on 5 min intervals
 # fm.auto<-fm %>%
@@ -956,17 +961,17 @@ ggsave("figures/auto_vs_man.jpg")
 fm.nona2<-fm.nona2%>%
   mutate(log.man.fish=log(man.fish+1))
 
-ggplot(data=om.nona2)+
-  geom_jitter(aes(x=log.man.fish,y=log.auto.fish, colour=spl.sc),size=2, width = .15)+
-  geom_text(aes(x=2,y=4),label="Auto detections (5 min)",size=10)+
-  geom_abline(intercept=0,slope=1)+
-  coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
-  scale_color_viridis_c()+
-  theme_bw()+
-  theme(panel.grid = element_blank())+
-  ylab("Log auto detections")+
-  xlab("Log manual detections")
-ggsave("figures/auto_vs_man_5m_log.jpg")
+# ggplot(data=om.nona2)+
+#   geom_jitter(aes(x=log.man.fish,y=log.auto.fish, colour=spl.sc),size=2, width = .15)+
+#   geom_text(aes(x=2,y=4),label="Auto detections (5 min)",size=10)+
+#   geom_abline(intercept=0,slope=1)+
+#   coord_fixed(xlim = c(0,4.25), ylim = c(0,4.25)) +
+#   scale_color_viridis_c()+
+#   theme_bw()+
+#   theme(panel.grid = element_blank())+
+#   ylab("Log auto detections")+
+#   xlab("Log manual detections")
+# ggsave("figures/auto_vs_man_5m_log.jpg")
 
 # log-log scatterplot of predictions against manual detections
 ggplot(data=fm.nona2)+
@@ -1006,3 +1011,5 @@ ggplot(data=fm.nona2)+
   ylab("GAM Prediction")+
   xlab("Manual detections")
 ggsave("figures/gam_vs_man_ls.jpg")
+
+
