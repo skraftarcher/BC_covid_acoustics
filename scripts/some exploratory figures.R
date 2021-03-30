@@ -544,5 +544,10 @@ fish.s<-fish2%>%
 
 ggplot(fish.s)+
   geom_point(aes(x=doy,y=mean.call.per.min,color=as.factor(yr)),size=4)+
-  geom_line(aes(x=doy,y=mean.call.per.min,color=as.factor(yr),group=prd))+
-  facet_wrap(~tod,ncol = 1)
+  geom_pointrange(aes(x=doy,y=mean.call.per.min,
+    xmin=doy,xmax=doy, 
+    ymin=mean.call.per.min-sd.call.per.min, ymax=mean.call.per.min+sd.call.per.min, 
+    color=as.factor(yr))) +
+  geom_smooth(aes(x=doy,y=mean.call.per.min,color=as.factor(yr),group=prd), se=F)+
+  facet_wrap(~tod,ncol = 1) +
+  ggsidekick::theme_sleek()
