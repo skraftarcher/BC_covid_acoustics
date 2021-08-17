@@ -63,6 +63,7 @@ selec.tables193<-selec.tables192[idxa,]%>%
   select(-filedt,-selec.file)%>%
   mutate(old.selection=Selection)
 
+selec.tables193$Selection<-seq_len(nrow(selec.tables193))
 
 idx2<-NULL
 idx2b<-NULL
@@ -73,29 +74,57 @@ for(i in 1:nrow(selec.tables202)){
 }
 
 selec.tables203<-selec.tables202[idx2,]%>%
-  select(-filedt,-call.time,-selec.file)%>%
+  select(-filedt,-selec.file)%>%
   mutate(old.selection=Selection)
 
+selec.tables203$Selection<-seq_len(nrow(selec.tables203))
+
+selec.tables193$`Begin Path`<-paste0("E:\\RCA_IN\\April_July2019\\1342218252\\",selec.tables193$`Begin Path`)
+selec.tables203$`Begin Path`<-paste0("E:\\RCA_IN\\April_July2020\\",selec.tables203$`Begin Path`)
 
 
 
-selec.tables<-bind_rows(selec.tables193,selec.tables203)%>%
-  mutate(Selection=row.names(.))
 
+# write.table(selec.tables193[1:60000,], file = "w.selection.tables/five_minute_passages_2019filesa.txt",
+#             sep = "\t", row.names = FALSE, quote = FALSE)
+# write.table(selec.tables193[60001:120000,], file = "w.selection.tables/five_minute_passages_2019filesb.txt",
+#             sep = "\t", row.names = FALSE, quote = FALSE)
+# write.table(selec.tables193[120001:163731,], file = "w.selection.tables/five_minute_passages_2019filesc.txt",
+#             sep = "\t", row.names = FALSE, quote = FALSE)
 
-
-write.table(new.files, file = "w.selection.tables/five_minute_passages.txt", 
+write.table(selec.tables203, file = "w.selection.tables/five_minute_passages_2020files.txt",
             sep = "\t", row.names = FALSE, quote = FALSE)
+
+
+# once you've updated the selection tables in Raven to include peak power density and 
+# inband power reload selec.table193 and selec.table203 here
+selec.tables193b<-imp_raven(path="w.selection.tables",
+                           files=c("five_minute_passages_2019filesa.txt",
+                                   "five_minute_passages_2019filesb.txt",
+                                   "five_minute_passages_2019filesc.txt"),
+                           all.data = TRUE)%>%
+  select(-selec.file)
+
 
 
 # get fish calls per interval
 idxb<-idxb[idxa]
 
-fishcalls19<-bind_cols(selec.tables193,all19[idxb,colnames(all19)%in% c("inter","prd","type")])%>%
+fishcalls19<-bind_cols(selec.tables193b,all19[idxb,colnames(all19)%in% c("inter","prd","type")])%>%
   mutate(fcalls=ifelse(Class=="FS",1,0))%>%
   group_by(inter,prd,type)%>%
   summarize(fish.calls=sum(fcalls))%>%
   mutate(yr=2019)
+
+fishcalls192<-bind_cols(selec.tables193b,all19[idxb,colnames(all19)%in% c("inter","prd","type")])%>%
+  filter(Class=="FS")%>%
+  select(inter,prd,type,Confidence,inband.power=`Inband Power (dB FS)`,peak.power= `Peak Power Density (dB FS)`)%>%
+  mutate(inband.power=inband.power+175.9,
+         peak.power=peak.power+175.9)
+
+write_rds(fishcalls192,"wdata/fishcall_power_2019.rds")
+  
+  
 
 idx2b<-idx2[idx2a]
 

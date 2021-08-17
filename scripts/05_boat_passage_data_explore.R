@@ -43,3 +43,32 @@ boatpass2<-boatpass%>%
 
 (p1+p4)/p3
 ggsave("figures/initial_data_explore_boat_passage.jpg",dpi=300)
+
+# look at fish call power here
+
+fcpower19<-read_rds("wdata/fishcall_power_2019.rds")
+fcpower19$prd<-factor(fcpower19$prd,levels=c("pre","ferry","post"))
+
+ip<-ggplot(fcpower19)+
+  geom_boxplot(aes(x=prd,y=inband.power,fill=prd))+
+  facet_wrap(~type)
+
+
+pp<-ggplot(fcpower19)+
+  geom_boxplot(aes(x=prd,y=peak.power,fill=prd))+
+  facet_wrap(~type)
+
+ip/pp
+ggsave("figures/call_power_distribution.jpg")
+
+ip2<-ggplot(fcpower19)+
+  geom_density(aes(x=inband.power,fill=prd),alpha=.25)+
+  facet_wrap(~type)
+
+
+pp2<-ggplot(fcpower19)+
+  geom_density(aes(x=peak.power,fill=prd),alpha=.25)+
+  facet_wrap(~type)
+
+ip2/pp2+plot_layout(guides = "collect")
+ggsave("figures/call_power_distribution2.jpg")
