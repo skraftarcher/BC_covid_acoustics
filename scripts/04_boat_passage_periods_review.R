@@ -6,8 +6,8 @@ lp(pck="lubridate")
 lp(pck="Rraven")
 
 # bring in data
-all19<-read.csv("wdata/periods_to_evaluate_19.csv")[,-1]
-all20<-read.csv("wdata/periods_to_evaluate_20.csv")[,-1]
+all19<-read.csv("wdata/periods_to_evaluate_19.csv", stringsAsFactors = F)[,-1]
+all20<-read.csv("wdata/periods_to_evaluate_20.csv", stringsAsFactors = F)[,-1]
 
 #collect files
 files<-c(unique(all19$stfile),unique(all20$stfile))
