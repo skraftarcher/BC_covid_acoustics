@@ -101,9 +101,9 @@ ggsave("figures/boat_passage_results.jpg",height = 9,width=4)
 
 # do analysis with trimmed data
 
-fcpower19<-read_rds("wdata/fishcall_power_2019.rds")
+fcpower<-read_rds("wdata/all_boat_passage_data_power.rds")
 
-fcpower.sum<-fcpower19%>%
+fcpower.sum<-fcpower%>%
   filter(type=="boat")%>%
   filter(prd=="ferry")%>%
   group_by(inter)%>%
@@ -117,28 +117,36 @@ all.periods<-boatpass%>%
   left_join(fcpower.sum)%>%
   filter(!is.na(inband.q1))
 
-# we have all 2019 periods
+# we have all periods
 
-fcp.ib<-fcpower19%>%
+fcp.ib<-fcpower%>%
   left_join(fcpower.sum)%>%
   filter(inband.power>=inband.q1)%>%
-  group_by(inter,prd,type)%>%
+  group_by(inter,prd,type,yr)%>%
   summarise(fish.calls=n())
 
 fcp.ib<-left_join(all.periods,fcp.ib)%>%
-  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls))
+  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls),
+         yr=case_when(
+           !is.na(yr)~yr,
+           is.na(yr) & inter <200~2019,
+           is.na(yr) & inter > 200 ~2020))
 
 fcp.ib$prd<-factor(fcp.ib$prd,levels = c("pre","ferry","post"))
 fcp.ib$type<-factor(fcp.ib$type,levels = c("quiet","boat"))
 
-fcp.pp<-fcpower19%>%
+fcp.pp<-fcpower%>%
   left_join(fcpower.sum)%>%
   filter(peak.power>=peak.q1)%>%
-  group_by(inter,prd,type)%>%
+  group_by(inter,prd,type,yr)%>%
   summarise(fish.calls=n())
 
 fcp.pp<-left_join(all.periods,fcp.pp)%>%
-  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls))
+  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls),
+         yr=case_when(
+           !is.na(yr)~yr,
+           is.na(yr) & inter <200~2019,
+           is.na(yr) & inter > 200 ~2020))
 
 fcp.pp$prd<-factor(fcp.pp$prd,levels = c("pre","ferry","post"))
 fcp.pp$type<-factor(fcp.pp$type,levels = c("quiet","boat"))
@@ -158,7 +166,7 @@ summary(ipglm)
 # same results as before
 
 # now doing the analysis with peak power as the filter
-ppglm<-glmmTMB(fish.calls~prd*type+(1|inter),
+ppglm<-glmmTMB(fish.calls~prd*type+(1|inter)+(1|yr),
                data=fcp.pp,
                family=nbinom1)
 
@@ -198,7 +206,8 @@ pdiff<-ggplot(fcp.ib2)+
     ylab("Total number of fish calls \n Boat Period")+
     theme(axis.title.x=element_blank(),
           axis.text.x = element_blank(),
-          legend.position = "bottom"))
+          legend.position = "bottom")+
+    facet_grid(~yr))
 
 (p2<-ggplot(data=fcp.ib%>%
               filter(type!="boat"))+
@@ -208,13 +217,42 @@ pdiff<-ggplot(fcp.ib2)+
     ylab("Total number of fish calls\n Quiet Period")+
     theme(axis.title.x=element_blank(),
           axis.text.x = element_blank(),
-          legend.position = "bottom"))
+          legend.position = "bottom")+
+    facet_grid(~yr))
 
 p1 / p2 + plot_layout(guides = 'collect')&
   theme(legend.position='bottom')
 
 ggsave("figures/boat_passage_results_inband.jpg",height = 9,width=4)
 
+#make peak power figures
+
+(p1<-ggplot(data=fcp.pp%>%
+              filter(type=="boat"))+
+    geom_boxplot(aes(x=prd,y=fish.calls,fill=prd))+
+    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+    #geom_text(aes(x=0.75,y=150,label="Boat Period"),size=5)+
+    ylab("Total number of fish calls \n Boat Period")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x = element_blank(),
+          legend.position = "bottom")+
+    facet_grid(~yr))
+
+(p2<-ggplot(data=fcp.pp%>%
+              filter(type!="boat"))+
+    geom_boxplot(aes(x=prd,y=fish.calls,fill=prd))+
+    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+    #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
+    ylab("Total number of fish calls\n Quiet Period")+
+    theme(axis.title.x=element_blank(),
+          axis.text.x = element_blank(),
+          legend.position = "bottom")+
+    facet_grid(~yr))
+
+p1 / p2 + plot_layout(guides = 'collect')&
+  theme(legend.position='bottom')
+
+ggsave("figures/boat_passage_results_peak.jpg",height = 9,width=4)
 
 
 

@@ -92,8 +92,8 @@ selec.tables203$`Begin Path`<-paste0("E:\\RCA_IN\\April_July2020\\",selec.tables
 # write.table(selec.tables193[120001:163731,], file = "w.selection.tables/five_minute_passages_2019filesc.txt",
 #             sep = "\t", row.names = FALSE, quote = FALSE)
 
-write.table(selec.tables203, file = "w.selection.tables/five_minute_passages_2020files.txt",
-            sep = "\t", row.names = FALSE, quote = FALSE)
+#write.table(selec.tables203, file = "w.selection.tables/five_minute_passages_2020files.txt",
+#            sep = "\t", row.names = FALSE, quote = FALSE)
 
 
 # once you've updated the selection tables in Raven to include peak power density and 
@@ -106,7 +106,10 @@ selec.tables193b<-imp_raven(path="w.selection.tables",
   select(-selec.file)
 
 
-
+selec.tables203b<-imp_raven(path="w.selection.tables",
+                            files="five_minute_passages_2020files_PE.txt",
+                            all.data=TRUE)%>%
+  select(-selec.file)
 # get fish calls per interval
 idxb<-idxb[idxa]
 
@@ -120,13 +123,14 @@ fishcalls192<-bind_cols(selec.tables193b,all19[idxb,colnames(all19)%in% c("inter
   filter(Class=="FS")%>%
   select(inter,prd,type,Confidence,inband.power=`Inband Power (dB FS)`,peak.power= `Peak Power Density (dB FS)`)%>%
   mutate(inband.power=inband.power+175.9,
-         peak.power=peak.power+175.9)
+         peak.power=peak.power+175.9,
+         yr=2019)
 
 write_rds(fishcalls192,"wdata/fishcall_power_2019.rds")
   
   
 
-idx2b<-idx2[idx2a]
+idx2b<-idx2b[idx2]
 
 fishcalls20<-bind_cols(selec.tables203,all20[idx2b,colnames(all20)%in% c("inter","prd","type")])%>%
   mutate(fcalls=ifelse(Class=="FS",1,0))%>%
@@ -134,7 +138,20 @@ fishcalls20<-bind_cols(selec.tables203,all20[idx2b,colnames(all20)%in% c("inter"
   summarize(fish.calls=sum(fcalls))%>%
   mutate(yr=2020)
 
+fishcalls202<-bind_cols(selec.tables203b,all20[idx2b,colnames(all20)%in% c("inter","prd","type")])%>%
+  filter(Class=="FS")%>%
+  select(inter,prd,type,Confidence,inband.power=`Inband Power (dB FS)`,peak.power= `Peak Power Density (dB FS)`)%>%
+  mutate(inband.power=inband.power+176.3,
+         peak.power=peak.power+176.3,
+         yr=2020)
+
+write_rds(fishcalls202,"wdata/fishcall_power_2020.rds")
+
 fish.call.all<-bind_rows(fishcalls19,fishcalls20)
+
+fish.call.all.power<-bind_rows(fishcalls192,fishcalls202)
+
+write_rds(fish.call.all.power,"wdata/fishcall_power_all.rds")
 
 # now get spl, wind speed, wave height, tide, precip for each interval
 all19mins<-read_rds("wdata/alldata2019.rds")
@@ -182,6 +199,8 @@ spl20<-bind_cols(all20mins[idx4,],all20[idx4b,colnames(all20)%in% c("inter","prd
 
 # group spl data and bind it to fish calls
 all.boat.passage<-left_join(fish.call.all,bind_rows(spl19,spl20))
+all.boat.passage.power<-left_join(fish.call.all.power,bind_rows(spl19,spl20))
 
 # write out this dataset
 write_rds(all.boat.passage,"wdata/all_boat_passage_data.rds")
+write_rds(all.boat.passage.power,"wdata/all_boat_passage_data_power.rds")
