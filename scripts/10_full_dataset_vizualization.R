@@ -4,7 +4,6 @@ source("scripts/install_packages_function.R")
 
 lp(pck="tidyverse")
 lp(pck="patchwork")
-lp(pck="suncalc")
 lp(pck="lubridate")
 
 
@@ -12,40 +11,11 @@ lp(pck="lubridate")
 all19<-read_rds("wdata/alldata2019.rds")
 all20<-read_rds("wdata/alldata2020.rds")
 
-#organize data
-
-all<-bind_rows(all19,all20)%>%
-  mutate(fish.pa=ifelse(fish.calls<=1,0,1),
-         SPL.start.time=force_tz(SPL.start.time,tz="America/Chicago"),
-         #date1=ymd(paste(yr,mnth,d)),
-         time.utc=with_tz(SPL.start.time,tz="UTC"))%>%
-  filter(!is.na(ship.close))
-
-all$date<-ymd(paste(all$yr,all$mnth,all$d))
-
-moon.phase<-getMoonIllumination(date = all$time.utc, keep = c("phase"))
-dawn<-getSunlightTimes(date = all$date, lat = 49.21445, lon = -123.892233, 
-                           keep = c( "dawn","dusk"), tz = "UTC")%>%
-  distinct()
 
 
-colnames(moon.phase)<-c("time.utc","moon.phase")
+all3<-read_rds("wdata/alldata_bothyears_withtod.rds")
 
-all2<-left_join(all,moon.phase)%>%
-  left_join(dawn)%>%
-  mutate(
-    dawn.end=dawn+3600,
-    dusk.end=dusk+3600,
-    tod=case_when(
-    SPL.start.time>=dawn & SPL.start.time<dawn.end ~ "dawn",
-    SPL.start.time>=dawn.end & SPL.start.time<dusk ~ "day",
-    SPL.start.time>=dusk & SPL.start.time<dusk.end ~ "dusk",
-    SPL.start.time>=dusk.end | SPL.start.time<dawn ~ "night"))
-
-# write this out so we can use this dataset for analysis
-write_rds(all2,"wdata/alldata_bothyears_withtod.rds")
-
-allboat<-all2%>%
+allboat<-all3%>%
   group_by(ship.close,yr)%>%
   summarize(n.call=sum(fish.pa),
             n.mins=n(),
