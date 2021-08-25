@@ -8,12 +8,14 @@ lp(pck="lubridate")
 
 
 # load data
-all19<-read_rds("wdata/alldata2019.rds")
-all20<-read_rds("wdata/alldata2020.rds")
-
-
+# all19<-read_rds("wdata/alldata2019.rds")
+# all20<-read_rds("wdata/alldata2020.rds")
 
 all3<-read_rds("wdata/alldata_bothyears_withtod.rds")
+
+all4<-all3%>%
+  pivot_longer(morning.golden:night.dark, names_to="tod",values_to="tod.val")%>%
+  filter(tod.val!=0)
 
 allboat<-all3%>%
   group_by(ship.close,yr)%>%
@@ -24,7 +26,7 @@ allboat<-all3%>%
             fish.call.se=sd(fish.calls)/sqrt(n.mins-1))%>%
   mutate(prop.mins=n.call/n.mins)
 
-allboat2<-all2%>%
+allboat2<-all3%>%
   group_by(ship.close,yr,hr)%>%
   summarize(n.call=sum(fish.pa),
             n.mins=n(),
@@ -36,7 +38,7 @@ allboat2<-all2%>%
             spl.var=var(SPL))%>%
   mutate(prop.mins=n.call/n.mins)
 
-allboat3<-all2%>%
+allboat3<-all4%>%
   group_by(ship.close,yr,tod)%>%
   summarize(n.call=sum(fish.pa),
             n.mins=n(),
@@ -51,7 +53,7 @@ allboat3<-all2%>%
 allboat$ship.close<-factor(allboat$ship.close,levels=c("no.ship","approaching","close"))
 allboat2$ship.close<-factor(allboat2$ship.close,levels=c("no.ship","approaching","close"))
 allboat3$ship.close<-factor(allboat3$ship.close,levels=c("no.ship","approaching","close"))
-
+allboat3$tod<-factor(allboat3$tod,levels=c("day","evening.golden","morning.golden","night.light","night.dark"))
 
 
 # start plotting
@@ -97,13 +99,12 @@ theme_update(panel.grid=element_blank())
     facet_grid(ship.close~yr)+
     ylab("Fish calls per minute")+
     scale_fill_viridis_c())
+ggsave("figures/fish_calls_by_timeofday_ship_year.jpg")
 
-(p5<-ggplot(allboat3)+
-    geom_bar(aes(x=tod,y=prop.mins),
-             stat="identity",position=position_dodge(0.9))+
-    facet_grid(ship.close~yr)+
-    scale_fill_viridis_c())
-
+(p6<-ggplot(all3%>%
+             filter(night.light!=0))+
+  geom_jitter(aes(x=night.light,y=fish.calls,color=SPL))+
+    facet_grid(yr~ship.close))
 
 
 

@@ -3,7 +3,6 @@
 source("scripts/install_packages_function.R")
 
 lp(pck="tidyverse")
-lp(pck="patchwork")
 lp(pck="suncalc")
 lp(pck="lubridate")
 
@@ -60,10 +59,11 @@ moon.phase<-moon.phase%>%
 
 timeofday<-timeofday%>%
   mutate(across(dawn:dusk,~with_tz(.x,tzone="Canada/Pacific")),
-         morning.golden.int=interval(dawn,goldenHourEnd),
-         day.int=interval(goldenHourEnd,goldenHour),
-         evening.golden.int=interval(goldenHour,dusk),
-         night.int=interval(dusk,dawn))%>%
+         morning.golden.int=interval(dawn+1,goldenHourEnd),
+         day.int=interval(goldenHourEnd+1,goldenHour),
+         evening.golden.int=interval(goldenHour+1,dusk),
+         night.int=interval(dusk+1,lead(dawn)),
+         night.int2=lag(night.int))%>%
   select(-lat:-dusk)
 
 all2<-all
@@ -82,8 +82,22 @@ all3<-all2%>%
   mutate(morning.golden=ifelse(SPL.start.time %within% morning.golden.int,1,0),
          day=ifelse(SPL.start.time %within% day.int,1,0),
          evening.golden=ifelse(SPL.start.time %within% evening.golden.int,1,0),
-         night=ifelse(SPL.start.time %within% night.int,1,0),
-         night=ifelse(night==1 & moon=="up",fraction,0))
+         night=case_when(
+           SPL.start.time %within% night.int~1,
+           SPL.start.time %within% night.int2~1,
+           !SPL.start.time%within% night.int~0,
+           !SPL.start.time %within% night.int2~0),
+         night.light=case_when(
+           night==1 & moon=="up"~fraction,
+           night==0 ~0,
+           night==1 & moon=="down"~0),
+         night.dark=case_when(
+           night==1 & moon=="up" & fraction==0~1,
+           night==1 & moon=="down" ~1,
+           night==1 & moon=="up" & fraction!=0~0,
+           night==0~0))%>%
+  select(-morning.golden.int:-night.int)
+
 
 all3$doy<-yday(all3$date)
 
