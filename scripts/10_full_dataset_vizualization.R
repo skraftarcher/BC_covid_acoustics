@@ -101,10 +101,123 @@ theme_update(panel.grid=element_blank())
     scale_fill_viridis_c())
 ggsave("figures/fish_calls_by_timeofday_ship_year.jpg")
 
+(p5b<-ggplot(allboat3)+
+    geom_bar(aes(x=tod,y=fish.call.mean,fill=ship.close),
+             stat="identity",position=position_dodge(0.9))+
+    geom_errorbar(aes(group=ship.close,x=tod,ymin=fish.call.mean-fish.call.se,ymax=fish.call.mean+fish.call.se),
+                  position=position_dodge(0.9),width=.1)+
+    facet_grid(~yr)+
+    ylab("Fish calls per minute")+
+    scale_fill_viridis_d())
+
 (p6<-ggplot(all3%>%
              filter(night.light!=0))+
   geom_jitter(aes(x=night.light,y=fish.calls,color=SPL))+
     facet_grid(yr~ship.close))
 
+# simplifying into dawn/dusk/day/night
+all5<-all4%>%
+  mutate(tod = case_when(
+    tod=="night.light" | tod=="night.dark" ~ "night",
+    tod!="night.light" & tod!="night.dark" ~ tod))
+
+(p7<-ggplot(data=all5)+
+    geom_density_ridges(aes(y=as.factor(yr),x=fish.calls,fill=tod),alpha=.5)+
+    facet_grid(~ship.pa))
+
+# make heatmap by tod
+all5$tod<-factor(all5$tod,levels=c("morning.golden","day","evening.golden","night"))
+
+all6<-all5%>%
+  group_by(doy,tod,yr)%>%
+  summarize(mfishcalls=mean(fish.calls),
+            medfishcalls=median(fish.calls),
+            vfishcalls=var(fish.calls),
+            mwind=mean(wind_spd,na.rm=T),
+            medwind=median(wind_spd,na.rm=T),
+            vwind=var(wind_spd,na.rm=T),
+            mspl=mean(SPL),
+            medspl=median(SPL),
+            vspl=var(SPL),
+            mtide=mean(tide,na.rm=T),
+            prop.ships=sum(ship.pa)/n())
+
+bhp<-ggplot(data=all6,aes(x=doy,y=tod))+
+  scale_fill_viridis_c(option = "B",end=.8)+
+  facet_grid(cols = vars(yr))+
+  scale_y_discrete(limits=c("night","evening.golden","day","morning.golden"))
+
+(p8<-bhp+
+    geom_tile(aes(fill=medfishcalls)))
+
+(p9<-bhp+
+    geom_tile(aes(fill=medwind)))
+
+(p10<-bhp+
+    geom_tile(aes(fill=prop.ships)))
+
+(p11<-bhp+
+    geom_tile(aes(fill=medspl)))
+
+p8/p9/p10/p11
+
+# make heat maps by hour
+# make heatmap by tod
+all7<-all3%>%
+  group_by(doy,hr,yr)%>%
+  summarize(fishcalls=sum(fish.calls),
+            mfishcalls=mean(fish.calls),
+            medfishcalls=median(fish.calls),
+            vfishcalls=var(fish.calls),
+            mwind=mean(wind_spd,na.rm=T),
+            medwind=median(wind_spd,na.rm=T),
+            vwind=var(wind_spd,na.rm=T),
+            mspl=mean(SPL),
+            medspl=median(SPL),
+            vspl=var(SPL),
+            mtide=mean(tide,na.rm=T),
+            prop.ships=sum(ship.pa)/n())
+
+bhp2<-ggplot(data=all7,aes(x=doy,y=hr))+
+  scale_fill_viridis_c(option = "B",end=.8)+
+  facet_grid(cols = vars(yr))+
+  scale_y_reverse()+
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+bhp2b<-ggplot(data=all7,aes(x=doy,y=hr))+
+  scale_fill_viridis_c(option = "B",end=.8)+
+  facet_grid(cols = vars(yr))+
+  scale_y_reverse()+
+  theme(strip.background = element_blank(),
+        strip.text = element_blank(),
+        axis.text.x = element_blank(),
+        axis.title.x = element_blank())
+
+bhp2c<-ggplot(data=all7,aes(x=doy,y=hr))+
+  scale_fill_viridis_c(option = "B",end=.8)+
+  facet_grid(cols = vars(yr))+
+  scale_y_reverse()+
+  theme(strip.background = element_blank(),
+        strip.text = element_blank())
+
+(p12<-bhp2+
+    geom_tile(aes(fill=medfishcalls)))
+
+(p13<-bhp2b+
+    geom_tile(aes(fill=medwind)))
+
+(p14<-bhp2b+
+    geom_tile(aes(fill=prop.ships)))
+
+(p15<-bhp2b+
+    geom_tile(aes(fill=medspl)))
+
+(p16<-bhp2c+
+    geom_tile(aes(fill=mtide)))
+
+p12/p13/p14/p15/p16
+
+ggsave("figures/summary_heatmaps_byhr.jpg")
 
 

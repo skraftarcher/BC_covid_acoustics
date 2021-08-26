@@ -96,7 +96,7 @@ all3<-all2%>%
            night==1 & moon=="down" ~1,
            night==1 & moon=="up" & fraction!=0~0,
            night==0~0))%>%
-  select(-morning.golden.int:-night.int)
+  select(-morning.golden.int:-night.int2,-night,-fraction)
 
 
 all3$doy<-yday(all3$date)
