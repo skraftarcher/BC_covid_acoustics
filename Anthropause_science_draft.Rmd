@@ -1,0 +1,52 @@
+---
+output: 
+  bookdown::word_document2:
+    number_sections: false
+editor_options: 
+  chunk_output_type: console
+bibliography: Rockfish_Acoustics.bib
+csl: science.csl
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+source("scripts/install_packages_function.R")
+lp(pck="tidyverse")
+```
+
+# Impacts of boat noise and the COVID-19 anthropause on fish calling behavior  
+
+## Authors  
+Philina A. English^1,*,+^, Stephanie K. Archer^2,+^, William D. Halliday ^3,4^, Xavier Mouy^5,6^, Dana Haggarty^1^, Sarah Dudas^1^, Francis Juanes^3^
+
+# Affiliations:  
+1. Pacific Biological Station, Fisheries and Oceans Canada, Nanaimo, British Columbia, Canada  
+2. Louisiana Universities Marine Consortium, Chauvin, Louisiana, USA  
+3. Department of Biology, University of Victoria, Victoria, BC, Canada  
+4. Wildlife Conservation Society Canada, Whitehorse, YT, Canada
+5. University of Victoria, School of Earth and Ocean Sciences, Victoria, BC, Canada  
+6. 
+
+# Abstract:  
+
+# Main Text:  
+## Introduction  
+
+## Methods  
+### Study Site  
+This study took place at two sites on a shallow water (< 50 ft) rocky reef just outside of Nanaimo Harbour in the Strait of Georgia on the Pacific Coast of Canada. 
+One site was located within the Northumberland Rockfish Conservation Area (RCA) and the other was located just outside the protected area.
+The substrate
+### Sound Recordings  
+
+
+
+## Results  
+
+## Discussion  
+
+# References 
+
+<div id="refs"></div>  
+
+# Acknowledgements  
