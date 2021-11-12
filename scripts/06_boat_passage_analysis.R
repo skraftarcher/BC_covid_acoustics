@@ -112,7 +112,16 @@ rminter<-fcpowera%>%
   summarize(fc=n())%>%
   filter(fc<=5)
 
-fcpower<-filter(fcpower, !inter %in% rminter$inter)
+fcpower<-filter(fcpowera, !inter %in% rminter$inter)
+
+all.periods<-fcpower%>%
+  select(yr,inter,prd,type)%>%
+  distinct()
+#get mean spl per passage/type
+
+write_rds(fcpower%>%
+  group_by(yr,prd,type)%>%
+  summarize(spl=mean(SPL.mean)),"wdata/boatpassage_meanspls.rds")
 
 fcpower.sum<-fcpower%>%
   filter(type=="boat")%>%
@@ -129,11 +138,7 @@ fcp.ib<-fcpower%>%
   summarise(fish.calls=n())
 
 fcp.ib<-left_join(all.periods,fcp.ib)%>%
-  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls),
-         yr=case_when(
-           !is.na(yr)~yr,
-           is.na(yr) & inter <200~2019,
-           is.na(yr) & inter > 200 ~2020))
+  mutate(fish.calls=ifelse(is.na(fish.calls),0,fish.calls))
 
 fcp.ib$prd<-factor(fcp.ib$prd,levels = c("pre","ferry","post"))
 fcp.ib$type<-factor(fcp.ib$type,levels = c("quiet","boat"))

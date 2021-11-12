@@ -177,10 +177,21 @@ ggplot(data=allhr)+
 # make a plot to look at this
 theme_set(theme_bw())
 theme_update(panel.grid = element_blank())
-col.pal=c("#403891ff","#de7065ff","6b4596ff")
 
-boatpass.pp<-read_rds("wdata/boat_passage_trimmed_peakpower.rds")
-boatpass.ip<-read_rds("wdata/boat_passage_trimmed_inbandpower.rds")
+#bring in SPLs for colors
+bpspl<-read_rds("wdata/boatpassage_meanspls.rds")%>%
+  mutate(spl=round(spl,1))
+col.pal=turbo(10,start=.2,end=.8)[c(1,10,2)]
+
+boatpass.pp<-read_rds("wdata/boat_passage_trimmed_peakpower.rds")%>%
+  left_join(bpspl)
+boatpass.ip<-read_rds("wdata/boat_passage_trimmed_inbandpower.rds")%>%
+  left_join(bpspl)
+
+boatpass.ip$prd<-factor(boatpass.ip$prd,levels = c("pre","ferry","post"))
+boatpass.ip$type<-factor(boatpass.ip$type,levels = c("quiet","boat"))
+boatpass.pp$prd<-factor(boatpass.pp$prd,levels = c("pre","ferry","post"))
+boatpass.pp$type<-factor(boatpass.pp$type,levels = c("quiet","boat"))
 
 boatpass.pp2<-boatpass.pp%>%
   select(inter,prd,type,yr,fish.calls)%>%
@@ -195,64 +206,65 @@ boatpass.ip2<-boatpass.ip%>%
          fc.diff2=boat-quiet)
 
 
-(p1<-ggplot(data=boatpass.pp%>%
-              filter(type=="boat"))+
-    geom_boxplot(aes(x=prd,y=fish.calls,fill=prd))+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
-    #geom_text(aes(x=0.75,y=150,label="Boat Period"),size=5)+
-    ylab("Total number of fish calls \n Boat Period")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x = element_blank(),
-          legend.position = "bottom"))
-
-(p2<-ggplot(data=boatpass.pp%>%
-              filter(type!="boat"))+
-    geom_boxplot(aes(x=prd,y=fish.calls,fill=prd))+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
-    #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
-    ylab("Total number of fish calls\n Quiet Period")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x = element_blank(),
-          legend.position = "bottom"))
-
-(p3<-ggplot(data=boatpass.pp2)+
-    geom_hline(aes(yintercept=0),linetype="dashed",alpha=.5)+
-    geom_boxplot(aes(x=prd,y=fc.diff,fill=prd))+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
-    #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=8)+
-    ylab("Difference in fish calls \n (Quiet - Boat)")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x = element_blank(),
-          legend.position = "bottom"))
-
-p1 / p2 / p3 / plot_layout(guides = 'collect')&
-  theme(legend.position='bottom')
-
-ggsave("figures/boat_passage_results_ppfiltered.jpg",height = 9,width=4)
+# (p1<-ggplot(data=boatpass.pp%>%
+#               filter(type=="boat"))+
+#     geom_boxplot(aes(x=prd,y=fish.calls,fill=spl))+
+#     scale_fill_viridis_c(option="H")+
+#     #scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+#     #geom_text(aes(x=0.75,y=150,label="Boat Period"),size=5)+
+#     ylab("Total number of fish calls \n Boat Period")+
+#     theme(axis.title.x=element_blank(),
+#           axis.text.x = element_blank(),
+#           legend.position = "bottom"))
+# 
+# (p2<-ggplot(data=boatpass.pp%>%
+#               filter(type!="boat"))+
+#     geom_boxplot(aes(x=prd,y=fish.calls,fill=prd))+
+#     scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+#     #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
+#     ylab("Total number of fish calls\n Quiet Period")+
+#     theme(axis.title.x=element_blank(),
+#           axis.text.x = element_blank(),
+#           legend.position = "bottom"))
+# 
+# (p3<-ggplot(data=boatpass.pp2)+
+#     geom_hline(aes(yintercept=0),linetype="dashed",alpha=.5)+
+#     geom_boxplot(aes(x=prd,y=fc.diff,fill=prd))+
+#     scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+#     #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=8)+
+#     ylab("Difference in fish calls \n (Quiet - Boat)")+
+#     theme(axis.title.x=element_blank(),
+#           axis.text.x = element_blank(),
+#           legend.position = "bottom"))
+# 
+# p1 / p2 / p3 / plot_layout(guides = 'collect')&
+#   theme(legend.position='bottom')
+# 
+# ggsave("figures/boat_passage_results_ppfiltered.jpg",height = 9,width=5)
 
 # second way of displaying boat passage results
 
-boatpass.pp$lgrp=paste0(boatpass.pp$inter,".",boatpass.pp$type)
-(p4<-ggplot(data=boatpass.pp)+
-  geom_line(aes(x=prd,y=fish.calls,group=lgrp,color=type),size=1.1,alpha=.6)+
-    scale_color_manual(values=c("#91bfdb","#fc8d59"),labels=c("Quiet","Boat Passage"),name="")+
-    scale_x_discrete(expand=c(0.05,0.05),labels=c("Pre-passage","Ferry Passage","Post-passage"))+
-    ylab("Total number of fish calls")+
-    theme(legend.position = "top",
-          axis.title.x = element_blank()))
-
-
-(p5<-ggplot(data=boatpass.pp2)+
-    geom_line(aes(x=prd,y=fc.diff,group=inter),size=1.1,alpha=.6)+
-    geom_hline(aes(yintercept=0),linetype="dashed",color="red",size=2)+
-    #scale_color_manual(values=c("#91bfdb","#fc8d59"),labels=c("Quiet","Boat Passage"),name="")+
-    scale_x_discrete(expand=c(0.05,0.05),labels=c("Pre-passage","Ferry Passage","Post-passage"))+
-    ylab("Difference in fish calls \n (Quiet - Boat)")+
-    theme(axis.title.x = element_blank()))
-
-p4/p5
-
-ggsave("figures/boat_passage_results_ppfiltered_line.jpg",height = 9,width=4)
+# boatpass.pp$lgrp=paste0(boatpass.pp$inter,".",boatpass.pp$type)
+# (p4<-ggplot(data=boatpass.pp)+
+#   geom_line(aes(x=prd,y=fish.calls,group=lgrp,color=type),size=1.1,alpha=.6)+
+#     scale_color_manual(values=c("#91bfdb","#fc8d59"),labels=c("Quiet","Boat Passage"),name="")+
+#     scale_x_discrete(expand=c(0.05,0.05),labels=c("Pre-passage","Ferry Passage","Post-passage"))+
+#     ylab("Total number of fish calls")+
+#     theme(legend.position = "top",
+#           axis.title.x = element_blank()))
+# 
+# 
+# (p5<-ggplot(data=boatpass.pp2)+
+#     geom_line(aes(x=prd,y=fc.diff,group=inter),size=1.1,alpha=.6)+
+#     geom_hline(aes(yintercept=0),linetype="dashed",color="red",size=2)+
+#     #scale_color_manual(values=c("#91bfdb","#fc8d59"),labels=c("Quiet","Boat Passage"),name="")+
+#     scale_x_discrete(expand=c(0.05,0.05),labels=c("Pre-passage","Ferry Passage","Post-passage"))+
+#     ylab("Difference in fish calls \n (Quiet - Boat)")+
+#     theme(axis.title.x = element_blank()))
+# 
+# p4/p5
+# 
+# ggsave("figures/boat_passage_results_ppfiltered_line.jpg",height = 9,width=4)
 
 
 (p1b<-ggplot(data=boatpass.pp%>%
@@ -265,37 +277,43 @@ ggsave("figures/boat_passage_results_ppfiltered_line.jpg",height = 9,width=4)
           axis.text.x = element_blank(),
           legend.position = "bottom"))
 
-(p2b<-ggplot(data=boatpass.pp%>%
-              filter(type!="boat"))+
-    geom_violin(aes(x=prd,y=fish.calls,fill=prd))+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
-    #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
-    ylab("Total number of fish calls\n Quiet Period")+
-    theme(axis.title.x=element_blank(),
-          axis.text.x = element_blank(),
-          legend.position = "bottom"))
+# (p2b<-ggplot(data=boatpass.pp%>%
+#               filter(type!="boat"))+
+#     geom_violin(aes(x=prd,y=fish.calls,fill=prd))+
+#     scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+#     #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
+#     ylab("Total number of fish calls\n Quiet Period")+
+#     theme(axis.title.x=element_blank(),
+#           axis.text.x = element_blank(),
+#           legend.position = "bottom"))
 
 (p3b<-ggplot(data=boatpass.pp2)+
     geom_violin(aes(x=prd,y=fc.diff2,fill=prd))+
     geom_hline(aes(yintercept=0),linetype="dashed",alpha=.5)+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+    #scale_fill_viridis_d(option="H")+
+    scale_fill_manual(values = col.pal,name="",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
     #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=8)+
     ylab("Difference in fish calls \n (Boat - Quiet)")+
     theme(axis.title.x=element_blank(),
-          axis.text.x = element_blank(),
-          legend.position = "bottom"))
+          #axis.text.x = element_blank(),
+          legend.position = "bottom")+
+    facet_wrap(~yr))
 
 (p2b<-ggplot(data=boatpass.pp)+
-    geom_violin_pattern(aes(x=prd,y=fish.calls,fill=prd,pattern=type))+
-    scale_fill_manual(values = col.pal,name="Passage Interval",labels=c("Pre-Ferry","Ferry passing","Post-Ferry"))+
+    geom_violin_pattern(aes(x=prd,y=fish.calls,fill=prd,pattern=type),pattern_spacing=.03)+
+    scale_pattern_manual(values=c("stripe","circle"),name="",labels=c("Control Period","Boat Passage"))+
+    #scale_pattern_fill_discrete(values=col.pal)+
+    scale_fill_manual(values = col.pal,guide=FALSE)+
     #geom_text(aes(x=0.75,y=225,label="Quiet Period"),size=5)+
+    #scale_fill_viridis_c(option="H")+
     ylab("Total number of fish calls")+
-    scale_y_continuous(expand=c(0,0))+
+    scale_y_continuous(expand=c(0,1))+
     theme(axis.title.x=element_blank(),
           axis.text.x = element_blank(),
-          legend.position = "bottom"))
+          legend.position = "bottom")+
+    facet_wrap(~yr))
 
-p1b / p2b / p3b / plot_layout(guides = 'collect')&
+p2b / p3b / plot_layout(guides = 'collect')&
   theme(legend.position='bottom')
 #color based on mean SPL
-ggsave("figures/boat_passage_results_ppfiltered_violin.jpg",height = 9,width=5)
+ggsave("figures/boat_passage_results_ppfiltered_violin.jpg",height = 9,width=8)
